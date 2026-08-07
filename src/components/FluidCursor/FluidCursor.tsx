@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import AtmosphereBackground from "@/components/AtmosphereBackground";
+import { useTheme } from "@/components/ThemeProvider";
 
 interface TrailPoint {
   x: number;
@@ -34,6 +36,9 @@ export default function FluidCursor({ children }: FluidCursorProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const underRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
+  const { isDark } = useTheme();
+  const darkRef = useRef(isDark);
+  darkRef.current = isDark;
 
   const pointer = useRef({ x: -100, y: -100 });
   const smooth = useRef({ x: -100, y: -100 });
@@ -224,6 +229,21 @@ export default function FluidCursor({ children }: FluidCursorProps) {
 
       vctx.globalCompositeOperation = "source-over";
       vctx.globalAlpha = 1;
+
+      // Dark mode: clear veil so Spline bg is fully visible
+      if (darkRef.current) {
+        vctx.clearRect(0, 0, vw, vh);
+        if (masked) {
+          clearMask(content);
+          clearMask(under);
+          under.style.opacity = "0";
+          masked = false;
+          maskTick = 0;
+        }
+        animId = requestAnimationFrame(render);
+        return;
+      }
+
       vctx.fillStyle = "#ffffff";
       vctx.fillRect(0, 0, vw, vh);
       vctx.globalCompositeOperation = "destination-out";
@@ -311,23 +331,20 @@ export default function FluidCursor({ children }: FluidCursorProps) {
 
   return (
     <>
-      <div className="galaxy-rgb pointer-events-none fixed inset-0 z-0" aria-hidden>
-        <div className="galaxy-rgb__layer galaxy-rgb__layer--base" />
-        <div className="galaxy-rgb__layer galaxy-rgb__layer--red" />
-        <div className="galaxy-rgb__layer galaxy-rgb__layer--cyan" />
-        <div className="galaxy-rgb__grain" />
-      </div>
+      <AtmosphereBackground />
 
       <div
         ref={underRef}
         id="fluid-text-under"
-        className="pointer-events-none fixed inset-0 z-0"
+        className={`pointer-events-none fixed inset-0 z-0 ${isDark ? "opacity-0" : ""}`}
         aria-hidden
       />
 
       <canvas
         ref={veilRef}
-        className="pointer-events-none fixed inset-0 z-[1] h-full w-full"
+        className={`pointer-events-none fixed inset-0 z-[1] h-full w-full ${
+          isDark ? "opacity-0" : ""
+        }`}
         aria-hidden
       />
 

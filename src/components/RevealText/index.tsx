@@ -17,10 +17,28 @@ type RevealTextProps = {
 
 const UNDER_ROOT_ID = "fluid-text-under";
 
+const FONT_PROPS = [
+  "fontFamily",
+  "fontSize",
+  "fontWeight",
+  "fontStyle",
+  "fontStretch",
+  "fontVariant",
+  "letterSpacing",
+  "lineHeight",
+  "textTransform",
+  "textDecorationLine",
+  "textDecorationStyle",
+  "textDecorationThickness",
+  "textUnderlineOffset",
+  "wordSpacing",
+  "whiteSpace",
+] as const;
+
 /**
  * Dark glyphs in the page layer (hard-punched out of holes).
- * White clone portaled under the veil — positioned to the inner text box
- * for pixel alignment (avoids padding/class double-offset ghosting).
+ * White clone portaled under the veil — position + computed type mirrored
+ * from the live base so hover reveal never jumps.
  */
 export default function RevealText({
   as: Tag = "span",
@@ -41,12 +59,32 @@ export default function RevealText({
       const under = underRef.current;
       if (base && under) {
         const r = base.getBoundingClientRect();
-        // left/top (not only transform) — subpixel-stable vs dark glyphs
+        const cs = getComputedStyle(base);
+        const inner = under.firstElementChild as HTMLElement | null;
+
         under.style.left = `${r.left}px`;
         under.style.top = `${r.top}px`;
         under.style.width = `${r.width}px`;
         under.style.height = `${r.height}px`;
+        under.style.padding = "0";
+        under.style.margin = "0";
+        under.style.border = "0";
+        under.style.boxSizing = "border-box";
         under.style.transform = "none";
+        under.style.overflow = "visible";
+
+        if (inner) {
+          for (const prop of FONT_PROPS) {
+            inner.style[prop] = cs[prop];
+          }
+          // Keep block metrics identical to the measured base box
+          inner.style.display = "block";
+          inner.style.width = "100%";
+          inner.style.height = "100%";
+          inner.style.margin = "0";
+          inner.style.padding = "0";
+          inner.style.boxSizing = "border-box";
+        }
       }
       raf = requestAnimationFrame(sync);
     };
@@ -74,8 +112,7 @@ export default function RevealText({
             style={{ left: 0, top: 0, width: 0, height: 0 }}
             aria-hidden
           >
-            {/* Mirror typography without outer padding/margin (already in rect) */}
-            <span className={`reveal-fluid-overlay__inner ${className}`.trim()}>
+            <span className="reveal-fluid-overlay__inner">
               <span className="reveal-fluid-overlay__rgb reveal-fluid-overlay__rgb--r">
                 {children}
               </span>

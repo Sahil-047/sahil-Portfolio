@@ -1,8 +1,17 @@
+"use client";
+
 import Navbar from "@/components/Navbar";
 import RevealText from "@/components/RevealText";
 import ProjectCarousel from "@/components/ProjectCarousel";
+import Footer from "@/components/Footer";
+import { SITE } from "@/lib/site";
 
-export default function Home() {
+type HomeProps = {
+  onInfoClick?: () => void;
+  onContactClick?: () => void;
+};
+
+export default function Home({ onInfoClick, onContactClick }: HomeProps) {
   return (
     <main
       id="page-content"
@@ -13,14 +22,14 @@ export default function Home() {
         className="film-grain pointer-events-none absolute inset-0 -z-[1] opacity-40"
       />
 
-      <header className="relative z-30 mb-3 flex w-full items-start justify-between gap-4">
+      <header className="relative z-30 mb-3 flex w-full items-center justify-between gap-4">
         <RevealText
           as="p"
-          className="cursor-default pl-1.5 font-[family-name:var(--font-display)] text-[clamp(1.05rem,2vw,.65rem)] font-semibold uppercase tracking-[-0.05em]"
+          className="cursor-default pl-1.5 font-[family-name:var(--font-display)] text-[clamp(1.05rem,2vw,.65rem)] font-semibold uppercase leading-none tracking-[-0.05em]"
         >
-          Sahil Golder
+          {SITE.name}
         </RevealText>
-        <Navbar />
+        <Navbar onInfoClick={onInfoClick} onContactClick={onContactClick} />
       </header>
 
       <div className="relative z-10 max-w-[min(100%,36rem)] lg:max-w-[min(52%,40rem)]">
@@ -43,6 +52,7 @@ export default function Home() {
       </div>
 
       <ProjectCarousel />
+      <Footer />
     </main>
   );
 }

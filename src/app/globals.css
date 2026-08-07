@@ -136,23 +136,6 @@ body {
   background-size: 120px 120px;
 }
 
-/* Navbar fluid hover (hero.mp4) */
-.nav-fluid-blob {
-  background: radial-gradient(
-    circle,
-    rgba(55, 120, 255, 0.55) 0%,
-    rgba(40, 100, 255, 0.28) 42%,
-    rgba(40, 100, 255, 0) 72%
-  );
-  filter: blur(12px);
-  will-change: transform, opacity;
-}
-
-.nav-fluid-item {
-  display: inline-block;
-  will-change: transform;
-}
-
 /* Dark text in SVG-masked veil; white/RGB clone under veil (holes only) */
 .reveal-root {
   color: #171717;
@@ -166,7 +149,7 @@ body {
 .reveal-fluid-overlay {
   color: #ffffff;
   display: block;
-  overflow: hidden;
+  overflow: visible;
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -183,6 +166,15 @@ body {
   width: 100%;
   height: 100%;
   position: relative;
+}
+
+.reveal-fluid-overlay__core,
+.reveal-fluid-overlay__rgb {
+  white-space: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  font: inherit;
+  text-transform: inherit;
 }
 
 .fluid-veil-svg {
@@ -221,7 +213,25 @@ body {
   opacity: 0.45;
 }
 
-/* Project carousel — page-static; track scrolled via window wheel */
+/* Project carousel — ~3 × 16:9 cards in view; rest scroll via wheel */
+.project-carousel {
+  --carousel-inset: 2rem; /* top-4 + bottom-4 */
+  --carousel-gap: 1rem;
+  --carousel-h: calc(100dvh - var(--carousel-inset));
+  --card-scale: 1.14; /* a bit larger than exact 3-fit */
+  width: min(
+    calc((var(--carousel-h) - 2 * var(--carousel-gap)) * 16 / 27 * var(--card-scale)),
+    calc(100% - 1.5rem)
+  );
+}
+
+@media (min-width: 640px) {
+  .project-carousel {
+    --carousel-inset: 5rem; /* top-5 + bottom-5 */
+    --carousel-gap: 1.25rem;
+  }
+}
+
 .project-carousel__track {
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
@@ -233,89 +243,225 @@ body {
   height: 0;
 }
 
-.project-carousel__card {
-  box-shadow: none;
+.project-carousel__list {
+  gap: var(--carousel-gap);
+  will-change: filter;
+  transform: translateZ(0);
 }
 
-/* Hidden galaxy — grainy glitchy RGB (revealed by fluid holes) */
+.project-carousel__card {
+  aspect-ratio: 16 / 9;
+  box-shadow: none;
+  will-change: clip-path;
+  transform: translateZ(0);
+}
+
+/* Soft blue atmosphere + RGB grain — revealed by fluid holes */
 .galaxy-rgb {
   overflow: hidden;
+  background: #02040a;
 }
 
-.galaxy-rgb__layer {
+.galaxy-rgb__base {
   position: absolute;
-  inset: -3%;
-  background-image: url("/images/galaxy-bg.png");
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-}
-
-.galaxy-rgb__layer--base {
   inset: 0;
-  filter: contrast(1.05) saturate(1.1);
+  background:
+    radial-gradient(
+      120% 90% at 100% 50%,
+      rgba(30, 70, 160, 0.35) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      105deg,
+      #010208 0%,
+      #02040c 38%,
+      #061028 72%,
+      #0a1a3a 100%
+    );
 }
 
-.galaxy-rgb__layer--red {
-  mix-blend-mode: screen;
-  opacity: 0.55;
-  filter: sepia(1) saturate(12) hue-rotate(-40deg) brightness(0.85) contrast(1.2);
-  animation: galaxy-rgb-glitch-r 2.8s steps(2, end) infinite;
+.galaxy-rgb__glow {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
 }
 
-.galaxy-rgb__layer--cyan {
-  mix-blend-mode: screen;
-  opacity: 0.5;
-  filter: sepia(1) saturate(14) hue-rotate(160deg) brightness(0.8) contrast(1.25);
-  animation: galaxy-rgb-glitch-c 2.4s steps(2, end) infinite;
+/* Soft out-of-focus limb on the right (reference bloom) */
+.galaxy-rgb__glow--core {
+  right: -18%;
+  top: 42%;
+  width: min(92vw, 980px);
+  height: min(92vw, 980px);
+  transform: translateY(-50%);
+  background: radial-gradient(
+    circle at 42% 48%,
+    rgba(170, 220, 255, 0.72) 0%,
+    rgba(90, 160, 255, 0.45) 18%,
+    rgba(40, 100, 220, 0.22) 38%,
+    rgba(15, 40, 120, 0.08) 58%,
+    transparent 72%
+  );
+  filter: blur(48px);
+  opacity: 0.95;
+}
+
+.galaxy-rgb__glow--halo {
+  right: -8%;
+  top: 48%;
+  width: min(110vw, 1200px);
+  height: min(85vw, 900px);
+  transform: translateY(-50%);
+  background: radial-gradient(
+    ellipse at 40% 50%,
+    rgba(100, 180, 255, 0.35) 0%,
+    rgba(50, 110, 220, 0.14) 40%,
+    transparent 70%
+  );
+  filter: blur(72px);
+  opacity: 0.85;
+}
+
+.galaxy-rgb__glow--wash {
+  left: 20%;
+  top: 30%;
+  width: min(70vw, 720px);
+  height: min(60vw, 560px);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(60, 120, 220, 0.12) 0%,
+    transparent 70%
+  );
+  filter: blur(80px);
+  opacity: 0.7;
+}
+
+.galaxy-rgb__mist {
+  position: absolute;
+  inset: -10%;
+  background:
+    radial-gradient(
+      80% 50% at 70% 40%,
+      rgba(80, 140, 255, 0.08) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      60% 40% at 85% 70%,
+      rgba(120, 190, 255, 0.1) 0%,
+      transparent 50%
+    );
+  filter: blur(40px);
+  opacity: 0.9;
+  animation: galaxy-mist-drift 22s ease-in-out infinite alternate;
+}
+
+@keyframes galaxy-mist-drift {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(-2%, 1.5%) scale(1.04);
+  }
 }
 
 .galaxy-rgb__grain {
   position: absolute;
-  inset: 0;
-  opacity: 0.45;
-  mix-blend-mode: overlay;
+  inset: -2%;
   pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-  background-size: 100px 100px;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+  will-change: transform;
+  animation: galaxy-rgb-drift 14s linear infinite;
 }
 
-@keyframes galaxy-rgb-glitch-r {
-  0%,
-  100% {
-    transform: translate(-3px, 1px);
-  }
-  25% {
-    transform: translate(-5px, -1px);
-  }
-  50% {
-    transform: translate(-2px, 2px);
-  }
-  75% {
-    transform: translate(-6px, 0);
-  }
+.galaxy-rgb__grain--mono {
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  animation-duration: 18s;
 }
 
-@keyframes galaxy-rgb-glitch-c {
-  0%,
-  100% {
-    transform: translate(3px, -1px);
+.galaxy-rgb__grain--r {
+  opacity: 0.18;
+  mix-blend-mode: screen;
+  transform: translate(-1.2px, 0.4px);
+  animation-duration: 11s;
+  animation-direction: reverse;
+  background-color: rgba(255, 40, 55, 0.12);
+  background-blend-mode: multiply;
+}
+
+.galaxy-rgb__grain--g {
+  opacity: 0.15;
+  mix-blend-mode: screen;
+  transform: translate(0.6px, -0.8px);
+  animation-duration: 13s;
+  background-color: rgba(40, 255, 120, 0.1);
+  background-blend-mode: multiply;
+}
+
+.galaxy-rgb__grain--b {
+  opacity: 0.17;
+  mix-blend-mode: screen;
+  transform: translate(1.1px, 0.7px);
+  animation-duration: 16s;
+  animation-direction: reverse;
+  background-color: rgba(55, 120, 255, 0.12);
+  background-blend-mode: multiply;
+}
+
+@keyframes galaxy-rgb-drift {
+  from {
+    background-position: 0 0;
   }
-  25% {
-    transform: translate(5px, 1px);
-  }
-  50% {
-    transform: translate(2px, -2px);
-  }
-  75% {
-    transform: translate(6px, 0.5px);
+  to {
+    background-position: 180px 120px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .galaxy-rgb__layer--red,
-  .galaxy-rgb__layer--cyan {
+  .galaxy-rgb__grain {
     animation: none;
   }
+
+  .galaxy-rgb__mist {
+    animation: none;
+  }
+}
+
+/* Dark mode — Spline bg fully visible, light UI type */
+html[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] body {
+  background: #02040a;
+  color: #f4f4f5;
+}
+
+html[data-theme="dark"] .reveal-root,
+html[data-theme="dark"] .reveal-base {
+  color: #f4f4f5;
+}
+
+html[data-theme="dark"] .nav-theme-toggle {
+  color: #f4f4f5;
+}
+
+html[data-theme="dark"] .film-grain {
+  opacity: 0.18;
+}
+
+html[data-theme="dark"] .galaxy-rgb__grain--mono {
+  opacity: 0.16;
+}
+
+html[data-theme="dark"] .galaxy-rgb__grain--r,
+html[data-theme="dark"] .galaxy-rgb__grain--g,
+html[data-theme="dark"] .galaxy-rgb__grain--b {
+  opacity: 0.1;
+}
+
+html[data-theme="dark"] .project-carousel__card {
+  background-color: rgb(23 23 23);
+  outline: 1px solid rgba(255, 255, 255, 0.08);
 }
 
