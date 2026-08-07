@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+/*
+  Boldini Bold Gradient 5 — drop licensed files into /public/fonts:
+  - Boldini-Bold-Gradient-5.woff2 (best)
+  - Boldini-Bold-Gradient-5.otf
+  - Boldini-Bold.otf / .ttf (solid cut; CSS supplies Gradient 5 fill)
+*/
+@font-face {
+  font-family: "Boldini";
+  src:
+    url("/fonts/Boldini-Bold-Gradient-5.woff2") format("woff2"),
+    url("/fonts/Boldini-Bold-Gradient-5.otf") format("opentype"),
+    url("/fonts/Boldini-Bold.woff2") format("woff2"),
+    url("/fonts/Boldini-Bold.otf") format("opentype"),
+    url("/fonts/Boldini-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #05070d;
+  --foreground: #f5f7fb;
+  --muted: #9aa3b2;
+  --loader-fg: #ffffff;
+  --font-display: "Boldini", var(--font-display-fallback), system-ui, sans-serif;
+  /* Boldini Bold Gradient 5 — diagonal light → dark */
+  --boldini-gradient-5: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    #d8d8d8 35%,
+    #6e6e6e 70%,
+    #1a1a1a 100%
+  );
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-body);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body), system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* —— Loader —— */
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  color: var(--loader-fg);
+  overflow: hidden;
+}
+
+.loader__background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.loader__background-image {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  transform: scale(1.04);
+}
+
+.loader__background-shade {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 55% 50% at 50% 48%,
+      rgba(0, 0, 0, 0.18) 0%,
+      rgba(0, 0, 0, 0.45) 100%
+    ),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.28));
+}
+
+.loader__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.loader__icon {
+  display: block;
+  width: clamp(3.75rem, 8vw, 5rem);
+  height: clamp(3.75rem, 8vw, 5rem);
+  color: var(--loader-fg);
+  overflow: visible;
+}
+
+.loader__percent {
+  font-family: var(--font-body), system-ui, sans-serif;
+  font-size: clamp(1.05rem, 2.2vw, 1.35rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+}
+
+/* Film grain — static (animated shift caused flicker) */
+.film-grain {
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 120px 120px;
+}
+
+/* Navbar fluid hover (hero.mp4) */
+.nav-fluid-blob {
+  background: radial-gradient(
+    circle,
+    rgba(55, 120, 255, 0.55) 0%,
+    rgba(40, 100, 255, 0.28) 42%,
+    rgba(40, 100, 255, 0) 72%
+  );
+  filter: blur(12px);
+  will-change: transform, opacity;
+}
+
+.nav-fluid-item {
+  display: inline-block;
+  will-change: transform;
+}
+
+/* Dark text in SVG-masked veil; white/RGB clone under veil (holes only) */
+.reveal-root {
+  color: #171717;
+}
+
+.reveal-base {
+  color: #171717;
+  display: block;
+}
+
+.reveal-fluid-overlay {
+  color: #ffffff;
+  display: block;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.reveal-fluid-overlay--under {
+  z-index: 0;
+}
+
+.reveal-fluid-overlay__inner {
+  display: block;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.fluid-veil-svg {
+  pointer-events: none;
+}
+
+.fluid-page-content {
+  -webkit-mask-mode: luminance;
+  mask-mode: luminance;
+}
+
+.reveal-fluid-overlay__core {
+  position: relative;
+  z-index: 2;
+  color: #ffffff;
+  display: block;
+}
+
+.reveal-fluid-overlay__rgb {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  display: block;
+}
+
+.reveal-fluid-overlay__rgb--r {
+  color: #ff3d7a;
+  transform: translate(-1px, 0);
+  opacity: 0.45;
+}
+
+.reveal-fluid-overlay__rgb--c {
+  color: #3ad0ff;
+  transform: translate(1px, 0);
+  opacity: 0.45;
+}
+
+/* Project carousel — page-static; track scrolled via window wheel */
+.project-carousel__track {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.project-carousel__track::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.project-carousel__card {
+  box-shadow: none;
+}
+
+/* Hidden galaxy — grainy glitchy RGB (revealed by fluid holes) */
+.galaxy-rgb {
+  overflow: hidden;
+}
+
+.galaxy-rgb__layer {
+  position: absolute;
+  inset: -3%;
+  background-image: url("/images/galaxy-bg.png");
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
+.galaxy-rgb__layer--base {
+  inset: 0;
+  filter: contrast(1.05) saturate(1.1);
+}
+
+.galaxy-rgb__layer--red {
+  mix-blend-mode: screen;
+  opacity: 0.55;
+  filter: sepia(1) saturate(12) hue-rotate(-40deg) brightness(0.85) contrast(1.2);
+  animation: galaxy-rgb-glitch-r 2.8s steps(2, end) infinite;
+}
+
+.galaxy-rgb__layer--cyan {
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  filter: sepia(1) saturate(14) hue-rotate(160deg) brightness(0.8) contrast(1.25);
+  animation: galaxy-rgb-glitch-c 2.4s steps(2, end) infinite;
+}
+
+.galaxy-rgb__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.45;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.6' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 100px 100px;
+}
+
+@keyframes galaxy-rgb-glitch-r {
+  0%,
+  100% {
+    transform: translate(-3px, 1px);
+  }
+  25% {
+    transform: translate(-5px, -1px);
+  }
+  50% {
+    transform: translate(-2px, 2px);
+  }
+  75% {
+    transform: translate(-6px, 0);
+  }
+}
+
+@keyframes galaxy-rgb-glitch-c {
+  0%,
+  100% {
+    transform: translate(3px, -1px);
+  }
+  25% {
+    transform: translate(5px, 1px);
+  }
+  50% {
+    transform: translate(2px, -2px);
+  }
+  75% {
+    transform: translate(6px, 0.5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galaxy-rgb__layer--red,
+  .galaxy-rgb__layer--cyan {
+    animation: none;
+  }
+}
+
