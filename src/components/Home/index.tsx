@@ -15,7 +15,7 @@ export default function Home({ onInfoClick, onContactClick }: HomeProps) {
   return (
     <main
       id="page-content"
-      className="relative z-[10] h-dvh max-h-dvh overflow-hidden bg-transparent px-3 py-4 sm:px-4 sm:py-5"
+      className="relative z-[10] h-dvh max-h-dvh overflow-visible bg-transparent px-3 py-4 sm:px-4 sm:py-5"
     >
       <div
         aria-hidden
@@ -32,7 +32,7 @@ export default function Home({ onInfoClick, onContactClick }: HomeProps) {
         <Navbar onInfoClick={onInfoClick} onContactClick={onContactClick} />
       </header>
 
-      <div className="relative z-10 max-w-[min(100%,36rem)] lg:max-w-[min(52%,40rem)]">
+      <div className="relative z-30 max-w-[min(100%,36rem)] lg:max-w-[min(52%,40rem)]">
         <RevealText
           as="h1"
           className="m-0 !block w-full cursor-default font-[family-name:var(--font-display)] text-[clamp(3.25rem,12vw,5.5rem)] font-bold uppercase leading-[0.9em] tracking-[-0.09em]"
@@ -50,6 +50,12 @@ export default function Home({ onInfoClick, onContactClick }: HomeProps) {
           surface.
         </RevealText>
       </div>
+
+      <div
+        id="smoke-front-root"
+        className="pointer-events-none absolute inset-0 z-[25]"
+        aria-hidden
+      />
 
       <ProjectCarousel />
       <Footer />

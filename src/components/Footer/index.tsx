@@ -9,7 +9,7 @@ const valueClass =
 export default function Footer() {
   return (
     <footer
-      className="pointer-events-none absolute inset-x-3 bottom-4 z-20 sm:inset-x-4 sm:bottom-5"
+      className="pointer-events-none absolute inset-x-3 bottom-4 z-30 sm:inset-x-4 sm:bottom-5"
       aria-label="Site footer"
     >
       <div className="flex items-end justify-between gap-6">

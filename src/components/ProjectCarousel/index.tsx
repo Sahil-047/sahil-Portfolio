@@ -3,39 +3,35 @@
 import { useRef } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { useTheme } from "@/components/ThemeProvider";
+import DarkProjectCarousel from "@/components/DarkProjectCarousel";
+import { PROJECTS } from "@/lib/projects";
 
 gsap.registerPlugin(useGSAP);
 
-const PROJECTS = [
-  { id: "estrela", label: "Estrela Studio" },
-  { id: "yucca", label: "Yucca Packaging" },
-  { id: "zulik", label: "Zulik" },
-  { id: "payjustnow", label: "PayJustNow" },
-  { id: "vineyard", label: "Vineyard Hotel" },
-] as const;
-
 const LOOPS = 3;
-/** Samples per card edge — more = smoother barrel curve */
 const EDGE_SAMPLES = 14;
-/** Max side inset as a fraction of card width */
 const MAX_INSET = 0.28;
-/** Flat rectangles at rest — warp only while scrolling */
 const REST_BEND = 0;
-/** Peak vertical motion-blur (px stdDeviation) */
 const MAX_BLUR = 14;
-/** Soft cap — normal scrolling never fully maxes the warp */
 const BEND_CAP = 0.85;
-/** Scroll energy → bend: light ticks stay subtle, strong streaks bend more */
 const ENERGY_GAIN = 0.4;
 const ENERGY_DECAY = 0.86;
 const ENERGY_SOFT = 6;
 const ENERGY_HARD = 95;
 
 /**
- * Centered vertical project strip (3 × 16:9 cards in view).
- * Wheel drives infinite scroll + fast convex/concave warp + motion blur.
+ * Light: infinite vertical strip with scroll warp.
+ * Dark: delegates to DarkProjectCarousel (3D coverflow tilt).
  */
 export default function ProjectCarousel() {
+  const { isDark } = useTheme();
+
+  if (isDark) return <DarkProjectCarousel />;
+  return <LightWarpCarousel />;
+}
+
+function LightWarpCarousel() {
   const rootRef = useRef<HTMLElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
@@ -75,8 +71,15 @@ export default function ProjectCarousel() {
           1,
           gsap.utils.mapRange(ENERGY_SOFT, ENERGY_HARD, 0, 1, energy),
         );
-        // Ease-in so slow scroll stays near minimum bend
         return Math.pow(t, 1.25) * BEND_CAP;
+      };
+
+      const clearWarp = () => {
+        list
+          .querySelectorAll<HTMLElement>(".project-carousel__card")
+          .forEach((card) => {
+            card.style.clipPath = "";
+          });
       };
 
       const measure = () => {
@@ -103,13 +106,17 @@ export default function ProjectCarousel() {
       const insetAt = (ny: number, b: number) => {
         const t = gsap.utils.clamp(-1, 1, ny);
         const curve = Math.cos(t * Math.PI * 0.5);
-        if (b >= 0) {
-          return b * MAX_INSET * (1 - curve);
-        }
+        if (b >= 0) return b * MAX_INSET * (1 - curve);
         return -b * MAX_INSET * curve;
       };
 
       const applyWarp = () => {
+        if (reduceMotion) {
+          clearWarp();
+          bend.value = 0;
+          return;
+        }
+
         const cards = list.querySelectorAll<HTMLElement>(
           ".project-carousel__card",
         );
@@ -119,7 +126,7 @@ export default function ProjectCarousel() {
         const b = bend.value;
 
         cards.forEach((card) => {
-          if (reduceMotion || b === 0) {
+          if (b === 0) {
             card.style.clipPath = "";
             return;
           }
@@ -132,7 +139,6 @@ export default function ProjectCarousel() {
 
           const left: string[] = [];
           const right: string[] = [];
-
           for (let i = 0; i <= EDGE_SAMPLES; i++) {
             const p = i / EDGE_SAMPLES;
             const y = r.top + p * r.height;
@@ -141,7 +147,6 @@ export default function ProjectCarousel() {
             left.push(`${x}% ${p * 100}%`);
             right.push(`${100 - x}% ${p * 100}%`);
           }
-
           card.style.clipPath = `polygon(${[...left, ...right.reverse()].join(",")})`;
         });
       };
@@ -186,16 +191,13 @@ export default function ProjectCarousel() {
 
         if (!reduceMotion && e.deltaY !== 0) {
           const nextSign = e.deltaY > 0 ? 1 : -1;
-          if (nextSign !== scrollSign) {
-            scrollEnergy *= 0.3;
-          }
+          if (nextSign !== scrollSign) scrollEnergy *= 0.3;
           scrollSign = nextSign;
           scrollEnergy = Math.min(
             ENERGY_HARD * 1.15,
             scrollEnergy + Math.abs(e.deltaY) * ENERGY_GAIN,
           );
           const strength = strengthFromEnergy(scrollEnergy);
-          // Down → convex, up → concave — magnitude follows scroll strength
           bendTo(scrollSign * strength);
           blurTo(strength * MAX_BLUR);
           scheduleRest();
@@ -228,6 +230,7 @@ export default function ProjectCarousel() {
         window.removeEventListener("wheel", onWheel);
         track.removeEventListener("scroll", onScroll);
         list.style.filter = "none";
+        clearWarp();
       };
     },
     { scope: rootRef },
@@ -268,26 +271,35 @@ export default function ProjectCarousel() {
         </defs>
       </svg>
 
-      <div
-        ref={trackRef}
-        className="project-carousel__track h-full overflow-y-auto overscroll-none"
-        tabIndex={0}
-      >
-        <ul
-          ref={listRef}
-          className="project-carousel__list m-0 flex list-none flex-col p-0"
+      <div className="project-carousel__stage h-full w-full">
+        <div
+          ref={trackRef}
+          className="project-carousel__track h-full overflow-y-auto overscroll-none"
+          tabIndex={0}
         >
-          {items.map((project) => (
-            <li key={project.key}>
-              <article
-                className="project-carousel__card pointer-events-auto relative w-full bg-neutral-950"
-                data-project={project.id}
-              >
-                <span className="sr-only">{project.label}</span>
-              </article>
-            </li>
-          ))}
-        </ul>
+          <ul
+            ref={listRef}
+            className="project-carousel__list m-0 flex list-none flex-col p-0"
+          >
+            {items.map((project) => (
+              <li key={project.key}>
+                <article
+                  className="project-carousel__card pointer-events-auto relative w-full overflow-hidden bg-neutral-950"
+                  data-project={project.id}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={project.image}
+                    alt=""
+                    className="absolute inset-0 h-full w-full object-cover"
+                    draggable={false}
+                  />
+                  <span className="sr-only">{project.label}</span>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </aside>
   );

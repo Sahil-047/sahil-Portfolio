@@ -350,7 +350,7 @@ export default function FluidCursor({ children }: FluidCursorProps) {
 
       <div
         ref={contentRef}
-        className="fluid-page-content fixed inset-0 z-[2] overflow-hidden"
+        className="fluid-page-content fixed inset-0 z-[2] overflow-visible"
       >
         {children}
       </div>
