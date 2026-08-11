@@ -61,7 +61,7 @@ body {
   overflow: hidden;
 }
 
-/* Loader */
+/* Loader — dark atmosphere + smoke */
 .loader {
   position: fixed;
   inset: 0;
@@ -70,33 +70,60 @@ body {
   place-items: center;
   color: var(--loader-fg);
   overflow: hidden;
+  background: #010206;
 }
 
 .loader__background {
   position: absolute;
   inset: 0;
   z-index: 0;
+  background: #010206;
 }
 
-.loader__background-image {
+.loader__stars {
   position: absolute;
   inset: 0;
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  transform: scale(1.04);
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
-.loader__background-shade {
+.loader__haze {
   position: absolute;
   inset: 0;
+  pointer-events: none;
   background:
     radial-gradient(
-      ellipse 55% 50% at 50% 48%,
-      rgba(0, 0, 0, 0.18) 0%,
-      rgba(0, 0, 0, 0.45) 100%
+      70% 60% at 70% 40%,
+      rgba(18, 40, 90, 0.22) 0%,
+      transparent 55%
     ),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.28));
+    radial-gradient(
+      55% 70% at 20% 80%,
+      rgba(40, 70, 140, 0.1) 0%,
+      transparent 60%
+    );
+}
+
+.loader__smoke {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0.7;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.loader__grain {
+  position: absolute;
+  inset: -2%;
+  pointer-events: none;
+  opacity: 0.28;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
 }
 
 .loader__content {
@@ -115,6 +142,7 @@ body {
   height: clamp(3.75rem, 8vw, 5rem);
   color: var(--loader-fg);
   overflow: visible;
+  filter: drop-shadow(0 0 18px rgba(140, 180, 255, 0.25));
 }
 
 .loader__percent {
@@ -125,6 +153,7 @@ body {
   letter-spacing: 0.01em;
   font-variant-numeric: tabular-nums;
   user-select: none;
+  color: rgba(244, 244, 245, 0.92);
 }
 
 /* Film grain - static (animated shift caused flicker) */
@@ -213,15 +242,23 @@ body {
   opacity: 0.45;
 }
 
+.reveal-fluid-overlay svg {
+  display: block;
+  color: inherit;
+}
+
 /* Project carousel */
 .project-carousel {
+  /* Keep cards clear of top-right Info / Contact / moon */
+  --carousel-nav-clearance: clamp(8.75rem, 20vw, 12.5rem);
   --carousel-inset: 2rem;
   --carousel-gap: 1rem;
   --carousel-h: calc(100dvh - var(--carousel-inset));
   --card-scale: 1.14;
+  right: var(--carousel-nav-clearance);
   width: min(
     calc((var(--carousel-h) - 2 * var(--carousel-gap)) * 16 / 27 * var(--card-scale)),
-    calc(100% - 1.5rem)
+    calc(100% - var(--carousel-nav-clearance) - 1rem)
   );
 }
 
@@ -229,6 +266,13 @@ body {
   .project-carousel {
     --carousel-inset: 5rem;
     --carousel-gap: 1.25rem;
+    --carousel-nav-clearance: clamp(9.5rem, 18vw, 13rem);
+  }
+}
+
+@media (max-width: 639px) {
+  .project-carousel {
+    --carousel-nav-clearance: clamp(7.5rem, 34vw, 10rem);
   }
 }
 
@@ -255,6 +299,34 @@ body {
   will-change: clip-path;
 }
 
+.project-carousel__card-img {
+  filter: grayscale(1) contrast(1.15) brightness(0.92);
+}
+
+.project-carousel__card-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.42;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.15' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+  background-repeat: repeat;
+}
+
+/* Full-color clone under the fluid veil */
+.reveal-fluid-image {
+  z-index: 0;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.reveal-fluid-image__color {
+  filter: none;
+  display: block;
+}
+
 .project-carousel__stage {
   transform-style: preserve-3d;
 }
@@ -265,6 +337,7 @@ body {
   max-width: none;
   overflow: visible;
   contain: none;
+  right: var(--carousel-nav-clearance);
 }
 
 .project-carousel--coverflow .project-carousel__viewport {
@@ -284,7 +357,7 @@ body {
 /* Soft blue atmosphere + RGB grain - revealed by fluid holes */
 .galaxy-rgb {
   overflow: hidden;
-  background: #02040a;
+  background: #010206;
   --rgb-r-x: -1.2px;
   --rgb-r-y: 0.4px;
   --rgb-g-x: 0.6px;
@@ -297,12 +370,30 @@ body {
 .galaxy-rgb__base {
   position: absolute;
   inset: 0;
-  background: linear-gradient(
-    105deg,
-    rgba(1, 2, 8, 0.35) 0%,
-    rgba(2, 4, 12, 0.2) 50%,
-    rgba(5, 10, 20, 0.15) 100%
-  );
+  background:
+    radial-gradient(
+      80% 70% at 70% 40%,
+      rgba(12, 28, 70, 0.14) 0%,
+      transparent 55%
+    ),
+    linear-gradient(
+      105deg,
+      rgba(0, 1, 5, 0.7) 0%,
+      rgba(1, 2, 8, 0.5) 50%,
+      rgba(2, 5, 12, 0.35) 100%
+    );
+  pointer-events: none;
+}
+
+.galaxy-rgb__smoke-back {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  opacity: 0.42;
+  mix-blend-mode: screen;
+  filter: blur(16px);
   pointer-events: none;
 }
 
@@ -316,14 +407,11 @@ body {
   pointer-events: none;
   background: radial-gradient(
     55% 70% at 92% 48%,
-    rgba(110, 160, 255, 0.16) 0%,
-    rgba(40, 90, 180, 0.06) 40%,
+    rgba(40, 70, 140, 0.09) 0%,
+    rgba(18, 40, 90, 0.04) 40%,
     transparent 70%
   );
-  opacity: 0;
-}
-
-html[data-theme="dark"] .galaxy-rgb__haze {
+  /* Always on — this layer is the fluid-reveal “dark mode” world under the veil */
   opacity: 1;
 }
 
@@ -331,7 +419,7 @@ html[data-theme="dark"] .galaxy-rgb__haze {
   width: 100%;
   height: 100%;
   display: block;
-  opacity: 0.78;
+  opacity: 0.48;
   mix-blend-mode: normal;
   filter: blur(18px);
   -webkit-mask-image: radial-gradient(
@@ -416,7 +504,7 @@ html[data-theme="dark"] {
 }
 
 html[data-theme="dark"] body {
-  background: #02040a;
+  background: #010206;
   color: #f4f4f5;
 }
 
@@ -429,21 +517,45 @@ html[data-theme="dark"] .nav-theme-toggle {
   color: #f4f4f5;
 }
 
+.nav-theme-toggle {
+  position: relative;
+  transform-origin: center center;
+  transform: perspective(240px) translateZ(0) scale(1);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nav-theme-toggle:hover,
+.nav-theme-toggle:focus-visible {
+  /* Elevate toward the screen (Z), not up the page */
+  transform: perspective(240px) translateZ(26px) scale(1.38);
+}
+
+.nav-theme-toggle:active {
+  transform: perspective(240px) translateZ(10px) scale(1.12);
+}
+
+/* Generous hit area so the portal hold is easy to catch */
+.nav-theme-toggle::before {
+  content: "";
+  position: absolute;
+  inset: -12px;
+}
+
 html[data-theme="dark"] .film-grain {
   opacity: 0.18;
 }
 
 html[data-theme="dark"] .galaxy-rgb__smoke-front {
-  opacity: 0.9;
+  opacity: 0.52;
 }
 
 html[data-theme="dark"] .galaxy-rgb__grain--mono {
-  opacity: 0.18;
+  opacity: 0.42;
 }
 
 html[data-theme="dark"] .galaxy-rgb__grain--r,
 html[data-theme="dark"] .galaxy-rgb__grain--g,
 html[data-theme="dark"] .galaxy-rgb__grain--b {
-  opacity: 0.1;
+  opacity: 0.28;
 }
 

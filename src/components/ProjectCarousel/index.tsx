@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { useTheme } from "@/components/ThemeProvider";
 import DarkProjectCarousel from "@/components/DarkProjectCarousel";
+import RevealImage from "@/components/RevealImage";
 import { PROJECTS } from "@/lib/projects";
 
 gsap.registerPlugin(useGSAP);
@@ -246,7 +247,7 @@ function LightWarpCarousel() {
   return (
     <aside
       ref={rootRef}
-      className="project-carousel pointer-events-none absolute top-4 bottom-4 left-1/2 z-20 max-w-[calc(100%-1.5rem)] translate-x-1/3 sm:top-5 sm:bottom-5"
+      className="project-carousel pointer-events-none absolute top-4 bottom-4 z-20 sm:top-5 sm:bottom-5"
       aria-label="Projects"
     >
       <svg
@@ -287,13 +288,7 @@ function LightWarpCarousel() {
                   className="project-carousel__card pointer-events-auto relative w-full overflow-hidden bg-neutral-950"
                   data-project={project.id}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={project.image}
-                    alt=""
-                    className="absolute inset-0 h-full w-full object-cover"
-                    draggable={false}
-                  />
+                  <RevealImage src={project.image} className="absolute inset-0 h-full w-full object-cover" />
                   <span className="sr-only">{project.label}</span>
                 </article>
               </li>

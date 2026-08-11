@@ -15,6 +15,7 @@ const TRAIL_LIFE_MS = 560;
 const MIN_STEP = 2.5;
 const BASE_RADIUS = 58;
 const MAX_RADIUS = 86;
+const PORTAL_RADIUS = 78;
 const MAX_POINTS = 96;
 /** Snappy follow — still exp-smoothed so it stays buttery */
 const POINTER_FOLLOW = 28;
@@ -36,9 +37,11 @@ export default function FluidCursor({ children }: FluidCursorProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
   const underRef = useRef<HTMLDivElement | null>(null);
   const [mounted, setMounted] = useState(false);
-  const { isDark } = useTheme();
+  const { isDark, isTransitioning } = useTheme();
   const darkRef = useRef(isDark);
   darkRef.current = isDark;
+  const transitioningRef = useRef(isTransitioning);
+  transitioningRef.current = isTransitioning;
 
   const pointer = useRef({ x: -100, y: -100 });
   const smooth = useRef({ x: -100, y: -100 });
@@ -71,6 +74,48 @@ export default function FluidCursor({ children }: FluidCursorProps) {
     let masked = false;
     let maskTick = 0;
     const trail: TrailPoint[] = [];
+    /** Theme toggle hover — freeze hole open like a portal */
+    const portal: { held: boolean; x: number; y: number; el: Element | null } =
+      { held: false, x: 0, y: 0, el: null };
+
+    const lockPortal = (el: Element) => {
+      const rect = el.getBoundingClientRect();
+      portal.held = true;
+      portal.el = el;
+      portal.x = rect.left + rect.width / 2;
+      portal.y = rect.top + rect.height / 2;
+      pointer.current.x = portal.x;
+      pointer.current.y = portal.y;
+    };
+
+    const onPortalOver = (e: PointerEvent | FocusEvent) => {
+      if (
+        transitioningRef.current ||
+        document.documentElement.hasAttribute("data-theme-transitioning")
+      ) {
+        return;
+      }
+      const el =
+        e.target instanceof Element
+          ? e.target.closest("[data-fluid-portal]")
+          : null;
+      if (!el) return;
+      const from = e.relatedTarget;
+      if (from instanceof Node && el.contains(from)) return;
+      lockPortal(el);
+    };
+
+    const onPortalOut = (e: PointerEvent | FocusEvent) => {
+      const el =
+        e.target instanceof Element
+          ? e.target.closest("[data-fluid-portal]")
+          : null;
+      if (!el) return;
+      const to = e.relatedTarget;
+      if (to instanceof Node && el.contains(to)) return;
+      portal.held = false;
+      portal.el = null;
+    };
 
     const punchCircle = (
       c: CanvasRenderingContext2D,
@@ -134,6 +179,8 @@ export default function FluidCursor({ children }: FluidCursorProps) {
     window.addEventListener("resize", handleResize);
 
     const handlePointerMove = (e: MouseEvent | TouchEvent | PointerEvent) => {
+      // Portal hold owns the pointer — vibration applied in render
+      if (portal.held) return;
       // Coalesced samples = butter-smooth path on fast flicks
       if ("getCoalescedEvents" in e && typeof e.getCoalescedEvents === "function") {
         const samples = e.getCoalescedEvents();
@@ -155,6 +202,10 @@ export default function FluidCursor({ children }: FluidCursorProps) {
     window.addEventListener("pointermove", handlePointerMove, { passive: true });
     window.addEventListener("mousemove", handlePointerMove, { passive: true });
     window.addEventListener("touchmove", handlePointerMove, { passive: true });
+    window.addEventListener("pointerover", onPortalOver, { passive: true });
+    window.addEventListener("pointerout", onPortalOut, { passive: true });
+    window.addEventListener("focusin", onPortalOver, { passive: true });
+    window.addEventListener("focusout", onPortalOut, { passive: true });
 
     const render = (ts: number) => {
       const vw = window.innerWidth;
@@ -162,6 +213,35 @@ export default function FluidCursor({ children }: FluidCursorProps) {
       const now = ts;
       const dt = lastTs ? Math.min(0.048, (now - lastTs) / 1000) : 1 / 60;
       lastTs = now;
+
+      // Theme portal cover owns the screen — stop fluid hole jitter
+      const themeCovering =
+        transitioningRef.current ||
+        document.documentElement.hasAttribute("data-theme-transitioning");
+      if (themeCovering) {
+        if (portal.held) {
+          portal.held = false;
+          portal.el = null;
+        }
+        // Let the trail age out quietly — no new points while covering
+      }
+
+      if (portal.held && !themeCovering) {
+        // Track elevated button center, then vibrate the hole
+        if (portal.el) {
+          const rect = portal.el.getBoundingClientRect();
+          portal.x = rect.left + rect.width / 2;
+          portal.y = rect.top + rect.height / 2;
+        }
+        const vibX =
+          Math.sin(now * 0.018) * 2.2 +
+          Math.sin(now * 0.031) * 1.1;
+        const vibY =
+          Math.cos(now * 0.021) * 1.9 +
+          Math.sin(now * 0.027) * 1.0;
+        pointer.current.x = portal.x + vibX;
+        pointer.current.y = portal.y + vibY;
+      }
 
       const px = pointer.current.x;
       const py = pointer.current.y;
@@ -173,7 +253,8 @@ export default function FluidCursor({ children }: FluidCursorProps) {
           prevSmooth.current.x = px;
           prevSmooth.current.y = py;
         } else {
-          const k = 1 - Math.exp(-POINTER_FOLLOW * dt);
+          const follow = portal.held ? POINTER_FOLLOW * 1.15 : POINTER_FOLLOW;
+          const k = 1 - Math.exp(-follow * dt);
           smooth.current.x += (px - smooth.current.x) * k;
           smooth.current.y += (py - smooth.current.y) * k;
         }
@@ -186,14 +267,30 @@ export default function FluidCursor({ children }: FluidCursorProps) {
 
         // Velocity → radius, eased so size changes stay smooth
         const speed = dist / Math.max(dt, 1 / 120);
-        const targetR = Math.min(
-          MAX_RADIUS,
-          Math.max(BASE_RADIUS - 6, BASE_RADIUS + 18 - speed * 0.04),
-        );
-        const rk = 1 - Math.exp(-RADIUS_FOLLOW * dt);
+        const vibR = portal.held
+          ? Math.sin(now * 0.022) * 2.8 + Math.sin(now * 0.035) * 1.4
+          : 0;
+        const targetR = portal.held
+          ? PORTAL_RADIUS + vibR
+          : Math.min(
+              MAX_RADIUS,
+              Math.max(BASE_RADIUS - 6, BASE_RADIUS + 18 - speed * 0.04),
+            );
+        const rk = 1 - Math.exp(-(portal.held ? RADIUS_FOLLOW * 0.55 : RADIUS_FOLLOW) * dt);
         smoothRadius.current += (targetR - smoothRadius.current) * rk;
 
-        if (dist > 0.2) {
+        if (portal.held) {
+          // Keep refreshing the hole so it never seals while hovering
+          trail.push({
+            x: sx,
+            y: sy,
+            radius: smoothRadius.current,
+            born: now,
+          });
+          prevSmooth.current.x = sx;
+          prevSmooth.current.y = sy;
+          while (trail.length > MAX_POINTS) trail.shift();
+        } else if (dist > 0.2) {
           const steps = Math.min(
             MAX_STEPS_PER_FRAME,
             Math.max(1, Math.ceil(dist / MIN_STEP)),
@@ -321,6 +418,10 @@ export default function FluidCursor({ children }: FluidCursorProps) {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("mousemove", handlePointerMove);
       window.removeEventListener("touchmove", handlePointerMove);
+      window.removeEventListener("pointerover", onPortalOver);
+      window.removeEventListener("pointerout", onPortalOut);
+      window.removeEventListener("focusin", onPortalOver);
+      window.removeEventListener("focusout", onPortalOut);
       cancelAnimationFrame(animId);
       clearMask(content);
       clearMask(under);

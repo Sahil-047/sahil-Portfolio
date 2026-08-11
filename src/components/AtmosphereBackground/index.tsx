@@ -1,19 +1,18 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTheme } from "@/components/ThemeProvider";
 
 /**
- * Optimized dark-mode atmosphere:
- * - ambient fog wanders randomly (capped, never piles up)
- * - mouse splash is temporary and clears quickly
- * - low-res sim + scaled blit (no dual full-res ImageData)
+ * Dark atmosphere under the white veil (always visible through fluid holes).
+ * In dark theme, smoke also paints on the front overlay host.
  */
 export default function AtmosphereBackground() {
   const { isDark } = useTheme();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const starsRef = useRef<HTMLCanvasElement | null>(null);
+  const smokeBackRef = useRef<HTMLCanvasElement | null>(null);
   const smokeRef = useRef<HTMLCanvasElement | null>(null);
   const glitch = useRef({ px: 0, py: 0 });
   const [frontHost, setFrontHost] = useState<HTMLElement | null>(null);
@@ -122,7 +121,7 @@ export default function AtmosphereBackground() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const paint = (t: number) => {
-      ctx.fillStyle = "#02040a";
+      ctx.fillStyle = "#010206";
       ctx.fillRect(0, 0, w, h);
       for (const s of stars) {
         const a = reduce ? s.a : s.a * (0.7 + 0.3 * Math.sin(t * 1.2 + s.tw));
@@ -139,13 +138,17 @@ export default function AtmosphereBackground() {
       canvas.width = w;
       canvas.height = h;
       stars.length = 0;
-      const count = Math.floor((w * h) / 14000);
-      for (let i = 0; i < count; i++) {
+      const count = Math.floor((w * h) / 9000);
+      const darkCount = Math.floor((w * h) / 2800);
+      const total = isDark ? darkCount : count;
+      for (let i = 0; i < total; i++) {
         stars.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          r: Math.random() < 0.9 ? 1 : 1.5,
-          a: 0.25 + Math.random() * 0.55,
+          r: isDark
+            ? Math.random() < 0.7 ? 1 : Math.random() < 0.92 ? 1.5 : 2
+            : Math.random() < 0.9 ? 1 : 1.5,
+          a: isDark ? 0.35 + Math.random() * 0.6 : 0.25 + Math.random() * 0.55,
           tw: Math.random() * Math.PI * 2,
         });
       }
@@ -165,19 +168,21 @@ export default function AtmosphereBackground() {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
     };
-  }, []);
+  }, [isDark]);
 
-  // Optimized smoke: ambient wander + ephemeral splash
+  // Optimized smoke: always under the veil (fluid reveal = dark world).
+  // In dark theme, also blit to the front overlay host.
   useEffect(() => {
-    if (!isDark || !frontHost) return;
-    const canvas = smokeRef.current;
+    const canvas = smokeBackRef.current;
     if (!canvas) return;
 
+    const front = isDark ? smokeRef.current : null;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
+    const frontCtx = front?.getContext("2d", { alpha: true }) ?? null;
 
-    // Tiny grid — blit upscaled + CSS blur
+    // Tiny grid â€” blit upscaled + CSS blur
     let gw = 96;
     let gh = 54;
     let amb = new Float32Array(gw * gh);
@@ -235,7 +240,7 @@ export default function AtmosphereBackground() {
       return v;
     };
 
-    /** Diagonal ribbons BL→TR — dense, slow drift & tangle */
+    /** Diagonal ribbons BLâ†’TR â€” dense, slow drift & tangle */
     const ambientTarget = (i: number, j: number, t: number) => {
       const u = i / gw;
       const v = j / gh;
@@ -247,34 +252,39 @@ export default function AtmosphereBackground() {
         Math.sin(across * 15 - t * 1.05) * 0.12 +
         Math.sin(diag * 22 + across * 8 + t * 1.4) * 0.07;
 
-      const wx = u * 3.0 + t * 0.12 + Math.sin(v * 4 + t * 0.55) * 0.45;
-      const wy = v * 2.7 - t * 0.11 + Math.cos(u * 3.5 + t * 0.65) * 0.4;
-      const n = fbm(wx + wobble, wy - wobble);
-      const n2 = fbm(wx * 1.7 - t * 0.08, wy * 1.6 + t * 0.09);
+      const band =
+        Math.exp(-Math.pow((across - wobble * 0.35) * 2.4, 2)) * 0.55 +
+        Math.exp(-Math.pow((across - 0.35 - wobble * 0.25) * 2.8, 2)) * 0.4 +
+        Math.exp(-Math.pow((across + 0.3 - wobble * 0.2) * 3.1, 2)) * 0.32;
 
-      // Wider overlapping strands = denser coverage
-      const strandA = Math.exp(-Math.pow((across + wobble * 1.2) * 1.55, 2));
-      const strandB = Math.exp(
-        -Math.pow((across - 0.32 + Math.sin(t * 0.45 + diag * 5) * 0.18) * 1.65, 2),
-      );
-      const strandC = Math.exp(
-        -Math.pow((across + 0.36 + Math.cos(t * 0.55 - diag * 4) * 0.2) * 1.5, 2),
-      );
-      const tangle = Math.min(1.35, strandA * 0.95 + strandB * 0.85 + strandC * 0.8);
+      const flow =
+        fbm(diag * 3.2 - t * 0.22, across * 2.6 + t * 0.18) * 0.55 +
+        fbm(u * 2.4 + t * 0.12, v * 2.1 - t * 0.1) * 0.35;
 
-      const along = 0.4 + 0.6 * Math.sin(diag * Math.PI);
-      return Math.min(
-        0.92,
-        (0.18 + 1.05 * tangle * along) * (0.45 + 0.55 * n) * (0.75 + 0.25 * n2),
-      );
+      const veil = Math.pow(Math.max(0, 1 - Math.abs(across) * 0.85), 1.2);
+      return Math.min(0.85, (band * 0.55 + flow * 0.4) * (0.4 + veil * 0.55));
     };
 
     const resize = () => {
       viewW = window.innerWidth;
       viewH = window.innerHeight;
-      const aspect = viewW / Math.max(viewH, 1);
-      gw = 96;
-      gh = Math.max(40, Math.round(gw / aspect));
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      canvas.width = Math.floor(viewW * dpr);
+      canvas.height = Math.floor(viewH * dpr);
+      canvas.style.width = `${viewW}px`;
+      canvas.style.height = `${viewH}px`;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (front && frontCtx) {
+        front.width = canvas.width;
+        front.height = canvas.height;
+        front.style.width = `${viewW}px`;
+        front.style.height = `${viewH}px`;
+        frontCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      gw = Math.max(64, Math.floor(viewW / 14));
+      gh = Math.max(36, Math.floor(viewH / 14));
       amb = new Float32Array(gw * gh);
       splash = new Float32Array(gw * gh);
       vx = new Float32Array(gw * gh);
@@ -284,126 +294,73 @@ export default function AtmosphereBackground() {
       buf.width = gw;
       buf.height = gh;
       img = bctx.createImageData(gw, gh);
-
-      const t = 0;
-      for (let j = 0; j < gh; j++) {
-        for (let i = 0; i < gw; i++) {
-          amb[ix(i, j)] = ambientTarget(i, j, t);
-        }
-      }
-
-      // Display canvas stays modest; CSS scales + blurs
-      const scale = 0.28;
-      canvas.width = Math.max(1, Math.floor(viewW * scale));
-      canvas.height = Math.max(1, Math.floor(viewH * scale));
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const splat = (nx: number, ny: number, dx: number, dy: number, amount: number) => {
-      const cx = (nx * (gw - 1)) | 0;
-      const cy = (ny * (gh - 1)) | 0;
-      const rad = Math.max(5, (6 + amount * 8) | 0);
-      const force = amount * 28; // slower splash push
-      const inj = Math.min(3.2, amount * 5.2); // denser visible blob
-      const t = (performance.now() - t0) * 0.001;
-      const len = Math.hypot(dx, dy) || 1;
-      const px = -dy / len;
-      const py = dx / len;
-      for (let j = -rad; j <= rad; j++) {
-        for (let i = -rad; i <= rad; i++) {
-          const x = cx + i;
-          const y = cy + j;
-          if (x < 1 || x >= gw - 1 || y < 1 || y >= gh - 1) continue;
-          const d2 = i * i + j * j;
-          if (d2 > rad * rad) continue;
-          const fall = Math.exp(-d2 / (rad * rad * 0.62));
-          const jig =
-            Math.sin(i * 1.4 + j * 1.8 + t * 5.5) * 0.4 +
-            Math.cos(i * 2.0 - j * 1.1 - t * 4.2) * 0.3;
-          splash[ix(x, y)] = Math.min(3.2, splash[ix(x, y)] + inj * fall);
-          vx[ix(x, y)] += (dx * force + px * jig * force * 0.7) * fall;
-          vy[ix(x, y)] += (dy * force + py * jig * force * 0.7) * fall;
-        }
-      }
     };
 
     const onPointer = (e: PointerEvent) => {
-      const nx = e.clientX / Math.max(viewW, 1);
-      const ny = e.clientY / Math.max(viewH, 1);
-      const dx = nx - pointer.px;
-      const dy = ny - pointer.py;
       pointer.px = pointer.x;
       pointer.py = pointer.y;
-      pointer.x = nx;
-      pointer.y = ny;
-      if (reduce) return;
-      const speed = Math.hypot(dx, dy);
-      if (speed < 0.002) return;
-      splat(nx, ny, dx, dy, Math.min(1.0, speed * 22));
+      pointer.x = e.clientX / Math.max(1, viewW);
+      pointer.y = e.clientY / Math.max(1, viewH);
     };
+
+    resize();
+    window.addEventListener("resize", resize);
     window.addEventListener("pointermove", onPointer, { passive: true });
 
     const step = (t: number) => {
-      for (let j = 1; j < gh - 1; j++) {
-        for (let i = 1; i < gw - 1; i++) {
-          const u = i / gw;
-          const v = j / gh;
-          const across = u - (1 - v);
-          const flowX = 0.12;
-          const flowY = -0.1;
-          const jigX =
-            Math.sin(v * 12 + t * 1.8 + u * 5) * 0.16 +
-            Math.sin(across * 16 - t * 2.2) * 0.13 +
-            Math.cos(u * 8 + v * 9 + t * 1.5) * 0.1 +
-            (fbm(u * 3 + t * 0.18, v * 3 - t * 0.14) - 0.5) * 0.18;
-          const jigY =
-            Math.cos(u * 11 - t * 1.9 + v * 6) * 0.15 +
-            Math.sin(across * 14 + t * 2.0) * 0.12 +
-            Math.sin(u * 9 - v * 10 + t * 1.6) * 0.09 +
-            (fbm(u * 2.8 - 2 + t * 0.16, v * 2.8 + t * 0.15) - 0.5) * 0.16;
-          const weave = Math.sin(across * 7 + t * 0.9) * 0.08;
+      const dx = pointer.x - pointer.px;
+      const dy = pointer.y - pointer.py;
+      const spd = Math.hypot(dx, dy);
+      pointer.px = pointer.x;
+      pointer.py = pointer.y;
 
-          vx[ix(i, j)] = vx[ix(i, j)] * 0.93 + flowX + jigX + weave;
-          vy[ix(i, j)] = vy[ix(i, j)] * 0.93 + flowY + jigY - weave * 0.35;
-        }
-      }
-
-      for (let j = 1; j < gh - 1; j++) {
-        for (let i = 1; i < gw - 1; i++) {
-          const target = ambientTarget(i, j, t);
-          let a = amb[ix(i, j)];
-          a += (target - a) * 0.035;
-          const wob =
-            Math.sin(i * 0.35 + j * 0.3 + t * 2.8) * 0.28 +
-            Math.cos(i * 0.25 - j * 0.4 - t * 2.2) * 0.2;
-          const si = i - vx[ix(i, j)] * 0.42 + wob;
-          const sj = j - vy[ix(i, j)] * 0.42 - wob * 0.55;
-          const i0 = Math.min(gw - 2, Math.max(1, si | 0));
-          const j0 = Math.min(gh - 2, Math.max(1, sj | 0));
-          a = a * 0.78 + amb[ix(i0, j0)] * 0.22;
-          ambTmp[ix(i, j)] = Math.min(0.95, Math.max(0, a));
-        }
-      }
-      amb.set(ambTmp);
-
-      for (let j = 1; j < gh - 1; j++) {
-        for (let i = 1; i < gw - 1; i++) {
-          const s = splash[ix(i, j)];
-          if (s < 0.004) {
-            splashTmp[ix(i, j)] = 0;
-            continue;
+      const cx = Math.floor(pointer.x * (gw - 1));
+      const cy = Math.floor(pointer.y * (gh - 1));
+      const splashR = 5;
+      if (spd > 0.0015) {
+        for (let j = -splashR; j <= splashR; j++) {
+          for (let i = -splashR; i <= splashR; i++) {
+            const ii = cx + i;
+            const jj = cy + j;
+            if (ii < 1 || jj < 1 || ii >= gw - 1 || jj >= gh - 1) continue;
+            const d = Math.hypot(i, j) / splashR;
+            if (d > 1) continue;
+            const k = (1 - d) * (1 - d);
+            const id = ix(ii, jj);
+            splash[id] = Math.min(2.8, splash[id] + k * spd * 42);
+            vx[id] += dx * k * 18;
+            vy[id] += dy * k * 18;
           }
+        }
+      }
+
+      for (let j = 1; j < gh - 1; j++) {
+        for (let i = 1; i < gw - 1; i++) {
+          const id = ix(i, j);
+          const target = ambientTarget(i, j, t);
+          amb[id] += (target - amb[id]) * 0.045;
+          vx[id] *= 0.965;
+          vy[id] *= 0.965;
+
           const jig =
-            Math.sin(i * 0.7 + t * 4.5) * 0.35 + Math.cos(j * 0.65 - t * 3.8) * 0.28;
-          const si = i - vx[ix(i, j)] * 0.48 + jig;
-          const sj = j - vy[ix(i, j)] * 0.48 - jig * 0.6;
+            (fbm(i * 0.08 + t * 0.3, j * 0.08 - t * 0.25) - 0.5) * 0.9;
+          const si = i - vx[id] * 0.48 + jig;
+          const sj = j - vy[id] * 0.48 - jig * 0.6;
           const i0 = Math.min(gw - 2, Math.max(1, si | 0));
           const j0 = Math.min(gh - 2, Math.max(1, sj | 0));
           splashTmp[ix(i, j)] = splash[ix(i0, j0)] * 0.94;
         }
       }
       splash.set(splashTmp);
+    };
+
+    const blit = (
+      target: HTMLCanvasElement,
+      targetCtx: CanvasRenderingContext2D,
+    ) => {
+      targetCtx.clearRect(0, 0, target.width, target.height);
+      targetCtx.imageSmoothingEnabled = true;
+      targetCtx.drawImage(buf, 0, 0, viewW, viewH);
     };
 
     const render = (t: number) => {
@@ -416,29 +373,35 @@ export default function AtmosphereBackground() {
           const u = i / gw;
           const base = amb[ix(i, j)];
           const sp = splash[ix(i, j)];
-          const dens = Math.min(1.7, base * 1.15 + sp * 1.45);
-          if (dens < 0.018) continue;
+          const dens = Math.min(1.2, base * 0.85 + sp * 1.1);
+          if (dens < 0.022) continue;
 
-          const dR = Math.min(1.7, base * 1.1 + splash[ix(Math.max(0, i - 1), j)] * 1.35);
-          const dB = Math.min(1.7, base * 1.1 + splash[ix(Math.min(gw - 1, i + 1), j)] * 1.35);
+          const dR = Math.min(
+            1.2,
+            base * 0.8 + splash[ix(Math.max(0, i - 1), j)] * 1.05,
+          );
+          const dB = Math.min(
+            1.2,
+            base * 0.8 + splash[ix(Math.min(gw - 1, i + 1), j)] * 1.05,
+          );
 
           const edgeWob =
             0.9 +
             0.1 *
               Math.sin(u * 14 + t * 1.4 + v * 9) *
               Math.sin(v * 11 - t * 1.15 + u * 6);
-          const densMul = edgeWob * 1.12;
+          const densMul = edgeWob * 0.95;
 
           const aR = Math.min(1, dR * densMul);
           const aG = Math.min(1, dens * densMul);
           const aB = Math.min(1, dB * densMul);
           const a = Math.max(aR, aG, aB);
-          if (a < 0.022) continue;
+          if (a < 0.028) continue;
 
-          const r = 40 + aR * 42;
-          const g = 58 + aG * 62;
-          const b = 92 + aB * 78;
-          const alpha = Math.min(230, 50 + dens * 155 + Math.min(sp, 2.4) * 70);
+          const r = 28 + aR * 32;
+          const g = 42 + aG * 48;
+          const b = 72 + aB * 58;
+          const alpha = Math.min(160, 28 + dens * 95 + Math.min(sp, 2.4) * 45);
 
           const p = (j * gw + i) * 4;
           data[p] = r;
@@ -449,9 +412,8 @@ export default function AtmosphereBackground() {
       }
 
       bctx.putImageData(img, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingEnabled = true;
-      ctx.drawImage(buf, 0, 0, canvas.width, canvas.height);
+      blit(canvas, ctx);
+      if (front && frontCtx) blit(front, frontCtx);
     };
 
     if (reduce) {
@@ -489,6 +451,11 @@ export default function AtmosphereBackground() {
         <canvas ref={starsRef} className="galaxy-rgb__stars absolute inset-0 h-full w-full" />
         <div className="galaxy-rgb__base" />
         <div className="galaxy-rgb__haze" />
+        <canvas
+          ref={smokeBackRef}
+          className="galaxy-rgb__smoke-back"
+          aria-hidden
+        />
         <div className="galaxy-rgb__grain galaxy-rgb__grain--r" />
         <div className="galaxy-rgb__grain galaxy-rgb__grain--g" />
         <div className="galaxy-rgb__grain galaxy-rgb__grain--b" />
