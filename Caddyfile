@@ -1,0 +1,8 @@
+www.sahilgolder.in {
+	redir https://sahilgolder.in{uri} permanent
+}
+
+sahilgolder.in {
+	encode gzip zstd
+	reverse_proxy web:3000
+}

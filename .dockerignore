@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.gitignore
+*.md
+.env*
+.vercel
+.cursor
+terminals
+agent-transcripts
+Dockerfile*
+docker-compose*
+Caddyfile
+npm-debug.log*
+.DS_Store

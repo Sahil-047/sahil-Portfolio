@@ -1,5 +1,7 @@
 export const SITE = {
   name: "Sahil Golder",
+  url: "https://sahilgolder.in",
+  domain: "sahilgolder.in",
   email: "sgolder4@gmail.com",
   available: "October 2026",
   year: 2026,

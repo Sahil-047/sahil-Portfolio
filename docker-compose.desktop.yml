@@ -1,0 +1,7 @@
+# Local Docker Desktop only. Hostinger should use docker-compose.yml by itself.
+services:
+  web:
+    ports:
+      - "3000:3000"
+  caddy:
+    profiles: ["hostinger"]
