@@ -3,7 +3,10 @@
 import Navbar from "@/components/Navbar";
 import RevealText from "@/components/RevealText";
 import ProjectCarousel from "@/components/ProjectCarousel";
+import ProjectIndex from "@/components/ProjectIndex";
 import Footer from "@/components/Footer";
+import MobileHome from "@/components/MobileHome";
+import useIsMobile from "@/hooks/useIsMobile";
 import { SITE } from "@/lib/site";
 
 type HomeProps = {
@@ -12,6 +15,16 @@ type HomeProps = {
 };
 
 export default function Home({ onInfoClick, onContactClick }: HomeProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile === null) return null;
+
+  if (isMobile) {
+    return (
+      <MobileHome onInfoClick={onInfoClick} onContactClick={onContactClick} />
+    );
+  }
+
   return (
     <main
       id="page-content"
@@ -35,7 +48,7 @@ export default function Home({ onInfoClick, onContactClick }: HomeProps) {
       <div className="relative z-30 max-w-[min(100%,36rem)] lg:max-w-[min(52%,40rem)]">
         <RevealText
           as="h1"
-          className="m-0 !block w-full cursor-default font-[family-name:var(--font-display)] text-[clamp(3.25rem,12vw,5.5rem)] font-bold uppercase leading-[0.9em] tracking-[-0.09em]"
+          className="m-0 !block w-full cursor-default font-[family-name:var(--font-display)] text-[clamp(3.7rem,13.5vw,6.15rem)] font-bold uppercase leading-[0.86em] tracking-[-0.09em]"
         >
           Creative
           <br />
@@ -58,6 +71,7 @@ export default function Home({ onInfoClick, onContactClick }: HomeProps) {
       />
 
       <ProjectCarousel />
+      <ProjectIndex />
       <Footer />
     </main>
   );

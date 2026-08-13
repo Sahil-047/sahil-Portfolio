@@ -3,7 +3,6 @@ export const SITE = {
   email: "sgolder4@gmail.com",
   available: "October 2026",
   year: 2026,
-  aboutImage: "/images/about.jpg",
   bio: [
     "I'm Sahil, I build for the web the way a director builds a scene: performance as the backbone, motion as the language.",
     "Design aware, code fluent I sit close enough to designers to speak their intent fluently, and translate it into interfaces that don't just load, they arrive.",

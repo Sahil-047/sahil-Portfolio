@@ -6,20 +6,24 @@ import { useGSAP } from "@gsap/react";
 import { useTheme } from "@/components/ThemeProvider";
 import DarkProjectCarousel from "@/components/DarkProjectCarousel";
 import RevealImage from "@/components/RevealImage";
-import { PROJECTS } from "@/lib/projects";
+import { PROJECTS, PROJECT_SELECT_EVENT, openProject } from "@/lib/projects";
 
 gsap.registerPlugin(useGSAP);
 
 const LOOPS = 3;
-const EDGE_SAMPLES = 14;
-const MAX_INSET = 0.28;
+const EDGE_SAMPLES = 8;
+const MAX_INSET = 0.4;
 const REST_BEND = 0;
-const MAX_BLUR = 14;
-const BEND_CAP = 0.85;
-const ENERGY_GAIN = 0.4;
-const ENERGY_DECAY = 0.86;
-const ENERGY_SOFT = 6;
-const ENERGY_HARD = 95;
+const BEND_CAP = 0.95;
+const MAX_BLUR = 26;
+const ENERGY_GAIN = 0.55;
+const ENERGY_DECAY = 0.84;
+const ENERGY_SOFT = 2;
+const ENERGY_HARD = 48;
+const WHEEL_SCALE = 1.4;
+const BEND_FOLLOW = 0.42;
+const BLUR_FOLLOW = 0.5;
+const BLUR_FILTER_ID = "project-carousel-motion-blur";
 
 /**
  * Light: infinite vertical strip with scroll warp.
@@ -49,22 +53,26 @@ function LightWarpCarousel() {
         "(prefers-reduced-motion: reduce)",
       ).matches;
 
+      gsap.ticker.lagSmoothing(0);
+
       let setHeight = 0;
       let wrapping = false;
       let placed = false;
       let scrollEnergy = 0;
       let scrollSign = 1;
-      const bend = { value: reduceMotion ? 0 : REST_BEND };
-      const blur = { value: 0 };
-      const bendTo = gsap.quickTo(bend, "value", {
-        duration: 0.1,
-        ease: "power3.out",
-      });
-      const blurTo = gsap.quickTo(blur, "value", {
-        duration: 0.08,
-        ease: "power2.out",
-      });
+      let bend = reduceMotion ? 0 : REST_BEND;
+      let blur = 0;
+      let lastBend = 0;
       let idleTween: gsap.core.Tween | null = null;
+      const cards = [
+        ...list.querySelectorAll<HTMLElement>(".project-carousel__card"),
+      ];
+      let metrics = cards.map((el) => ({ el, top: 0, height: 0 }));
+
+      if (feBlur && !reduceMotion) {
+        list.style.filter = `url(#${BLUR_FILTER_ID})`;
+        feBlur.setAttribute("stdDeviation", "0 0");
+      }
 
       const strengthFromEnergy = (energy: number) => {
         const t = gsap.utils.clamp(
@@ -72,19 +80,29 @@ function LightWarpCarousel() {
           1,
           gsap.utils.mapRange(ENERGY_SOFT, ENERGY_HARD, 0, 1, energy),
         );
-        return Math.pow(t, 1.25) * BEND_CAP;
+        return t * BEND_CAP;
       };
 
       const clearWarp = () => {
-        list
-          .querySelectorAll<HTMLElement>(".project-carousel__card")
-          .forEach((card) => {
-            card.style.clipPath = "";
-          });
+        cards.forEach((card) => {
+          card.style.clipPath = "";
+          card.style.willChange = "";
+        });
+      };
+
+      const applyBlur = (amount: number) => {
+        if (!feBlur || reduceMotion) return;
+        const y = amount < 0.08 ? 0 : amount;
+        feBlur.setAttribute("stdDeviation", `0 ${y.toFixed(2)}`);
       };
 
       const measure = () => {
         setHeight = list.scrollHeight / LOOPS;
+        metrics = cards.map((el) => ({
+          el,
+          top: (el.parentElement as HTMLElement).offsetTop,
+          height: el.offsetHeight,
+        }));
         if (!placed && setHeight > 0) {
           track.scrollTop = setHeight;
           placed = true;
@@ -113,106 +131,92 @@ function LightWarpCarousel() {
 
       const applyWarp = () => {
         if (reduceMotion) {
-          clearWarp();
-          bend.value = 0;
+          if (lastBend !== 0) clearWarp();
+          lastBend = 0;
+          bend = 0;
           return;
         }
 
-        const cards = list.querySelectorAll<HTMLElement>(
-          ".project-carousel__card",
-        );
-        const trackRect = track.getBoundingClientRect();
-        const centerY = trackRect.top + trackRect.height * 0.5;
-        const half = Math.max(trackRect.height * 0.5, 1);
-        const b = bend.value;
+        if (Math.abs(bend) < 0.003) {
+          if (lastBend !== 0) clearWarp();
+          lastBend = 0;
+          return;
+        }
+        lastBend = bend;
 
-        cards.forEach((card) => {
-          if (b === 0) {
-            card.style.clipPath = "";
-            return;
+        const scrollTop = track.scrollTop;
+        const trackH = track.clientHeight;
+        const centerY = scrollTop + trackH * 0.5;
+        const half = Math.max(trackH * 0.5, 1);
+
+        for (const { el, top, height } of metrics) {
+          if (top + height < scrollTop - 48 || top > scrollTop + trackH + 48) {
+            if (el.style.clipPath) el.style.clipPath = "";
+            continue;
           }
 
-          const r = card.getBoundingClientRect();
-          if (r.bottom < trackRect.top - 40 || r.top > trackRect.bottom + 40) {
-            card.style.clipPath = "";
-            return;
-          }
-
+          el.style.willChange = "clip-path";
           const left: string[] = [];
           const right: string[] = [];
           for (let i = 0; i <= EDGE_SAMPLES; i++) {
             const p = i / EDGE_SAMPLES;
-            const y = r.top + p * r.height;
-            const ny = (y - centerY) / half;
-            const x = insetAt(ny, b) * 100;
-            left.push(`${x}% ${p * 100}%`);
-            right.push(`${100 - x}% ${p * 100}%`);
+            const ny = (top + p * height - centerY) / half;
+            const x = insetAt(ny, bend) * 100;
+            left.push(`${x.toFixed(2)}% ${p * 100}%`);
+            right.push(`${(100 - x).toFixed(2)}% ${p * 100}%`);
           }
-          card.style.clipPath = `polygon(${[...left, ...right.reverse()].join(",")})`;
-        });
-      };
-
-      const applyBlur = () => {
-        if (reduceMotion || !feBlur) {
-          list.style.filter = "none";
-          return;
+          el.style.clipPath = `polygon(${[...left, ...right.reverse()].join(",")})`;
         }
-        const y = blur.value;
-        feBlur.setAttribute("stdDeviation", `0 ${y}`);
-        list.style.filter =
-          y > 0.04 ? "url(#project-carousel-motion-blur)" : "none";
       };
 
       const onTick = () => {
         scrollEnergy *= ENERGY_DECAY;
-        if (!reduceMotion && scrollEnergy > 0.4) {
-          const strength = strengthFromEnergy(scrollEnergy);
-          bendTo(scrollSign * strength);
-          blurTo(strength * MAX_BLUR);
+        if (!reduceMotion) {
+          const goal =
+            scrollEnergy > 0.25
+              ? scrollSign * strengthFromEnergy(scrollEnergy)
+              : REST_BEND;
+          bend += (goal - bend) * BEND_FOLLOW;
+          if (Math.abs(bend) < 0.002) bend = 0;
+          const blurGoal = (Math.abs(bend) / BEND_CAP) * MAX_BLUR;
+          blur += (blurGoal - blur) * BLUR_FOLLOW;
+          if (blur < 0.06) blur = 0;
+          applyBlur(blur);
         }
         applyWarp();
-        applyBlur();
       };
 
       const scheduleRest = () => {
         idleTween?.kill();
-        idleTween = gsap.delayedCall(0.12, () => {
-          if (reduceMotion) return;
+        idleTween = gsap.delayedCall(0.08, () => {
           scrollEnergy = 0;
-          bendTo(REST_BEND);
-          blurTo(0);
         });
       };
 
       const onWheel = (e: WheelEvent) => {
         if (e.ctrlKey) return;
         e.preventDefault();
-        track.scrollTop += e.deltaY;
+        track.scrollTop += e.deltaY * WHEEL_SCALE;
         normalize();
 
         if (!reduceMotion && e.deltaY !== 0) {
           const nextSign = e.deltaY > 0 ? 1 : -1;
-          if (nextSign !== scrollSign) scrollEnergy *= 0.3;
+          if (nextSign !== scrollSign) scrollEnergy *= 0.2;
           scrollSign = nextSign;
           scrollEnergy = Math.min(
-            ENERGY_HARD * 1.15,
+            ENERGY_HARD,
             scrollEnergy + Math.abs(e.deltaY) * ENERGY_GAIN,
           );
-          const strength = strengthFromEnergy(scrollEnergy);
-          bendTo(scrollSign * strength);
-          blurTo(strength * MAX_BLUR);
           scheduleRest();
         }
       };
 
       const onScroll = () => {
         normalize();
-        applyWarp();
       };
 
       measure();
       applyWarp();
-      applyBlur();
       gsap.ticker.add(onTick);
 
       const ro = new ResizeObserver(() => {
@@ -221,15 +225,30 @@ function LightWarpCarousel() {
       });
       ro.observe(list);
 
+      const onSelect = (e: Event) => {
+        const index = (e as CustomEvent<{ index: number }>).detail?.index;
+        if (typeof index !== "number") return;
+        const target = cards[index + PROJECTS.length];
+        if (!target) return;
+        const top =
+          target.offsetTop - (track.clientHeight - target.offsetHeight) / 2;
+        track.scrollTop = top;
+        normalize();
+        applyWarp();
+      };
+
       window.addEventListener("wheel", onWheel, { passive: false });
       track.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener(PROJECT_SELECT_EVENT, onSelect);
 
       return () => {
         gsap.ticker.remove(onTick);
+        gsap.ticker.lagSmoothing(500, 33);
         idleTween?.kill();
         ro.disconnect();
         window.removeEventListener("wheel", onWheel);
         track.removeEventListener("scroll", onScroll);
+        window.removeEventListener(PROJECT_SELECT_EVENT, onSelect);
         list.style.filter = "none";
         clearWarp();
       };
@@ -247,7 +266,7 @@ function LightWarpCarousel() {
   return (
     <aside
       ref={rootRef}
-      className="project-carousel pointer-events-none absolute top-4 bottom-4 z-20 sm:top-5 sm:bottom-5"
+      className="project-carousel pointer-events-none absolute inset-y-0 z-20"
       aria-label="Projects"
     >
       <svg
@@ -256,11 +275,11 @@ function LightWarpCarousel() {
       >
         <defs>
           <filter
-            id="project-carousel-motion-blur"
-            x="-10%"
-            y="-35%"
-            width="120%"
-            height="170%"
+            id={BLUR_FILTER_ID}
+            x="-20%"
+            y="-60%"
+            width="140%"
+            height="220%"
             colorInterpolationFilters="sRGB"
           >
             <feGaussianBlur
@@ -285,8 +304,12 @@ function LightWarpCarousel() {
             {items.map((project) => (
               <li key={project.key}>
                 <article
-                  className="project-carousel__card pointer-events-auto relative w-full overflow-hidden bg-neutral-950"
+                  className="project-carousel__card pointer-events-auto relative w-full cursor-pointer overflow-hidden bg-neutral-950"
                   data-project={project.id}
+                  onClick={() => {
+                    const i = PROJECTS.findIndex((p) => p.id === project.id);
+                    if (i >= 0) openProject(i);
+                  }}
                 >
                   <RevealImage src={project.image} className="absolute inset-0 h-full w-full object-cover" />
                   <span className="sr-only">{project.label}</span>

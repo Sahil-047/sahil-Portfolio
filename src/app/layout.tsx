@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Archivo_Black, DM_Sans } from "next/font/google";
 import "./globals.css";
 
+
 /** Geometric bold fallback until licensed Boldini files are added to /public/fonts */
 const archivoBlack = Archivo_Black({
   variable: "--font-display-fallback",
@@ -16,7 +17,10 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Sahil | Creative Developer",
+  icons: {
+    icon: "/cat.svg",
+  },
+  title: "Hii!!! Ready to make magic?",
   description:
     "Building high-performance websites with more to discover beneath the surface.",
 };

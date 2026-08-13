@@ -18,6 +18,7 @@ export default function RevealImage({ src, className = "" }: RevealImageProps) {
   const baseRef = useRef<HTMLImageElement | null>(null);
   const underRef = useRef<HTMLDivElement | null>(null);
   const [underRoot, setUnderRoot] = useState<HTMLElement | null>(null);
+  const [hot, setHot] = useState(false);
 
   useEffect(() => {
     setUnderRoot(document.getElementById(UNDER_ROOT_ID));
@@ -27,23 +28,34 @@ export default function RevealImage({ src, className = "" }: RevealImageProps) {
       const base = baseRef.current;
       const under = underRef.current;
       if (base && under) {
-        const r = base.getBoundingClientRect();
+        // Measure the untransformed card so hover scale doesn't shift the underlay
+        const slot = base.parentElement ?? base;
+        const r = slot.getBoundingClientRect();
         under.style.left = `${r.left}px`;
         under.style.top = `${r.top}px`;
         under.style.width = `${r.width}px`;
         under.style.height = `${r.height}px`;
-        // Match parent clip when the carousel warps cards
-        const parent = base.parentElement;
-        if (parent) {
-          const clip = getComputedStyle(parent).clipPath;
-          under.style.clipPath = clip && clip !== "none" ? clip : "";
-        }
+        const clip = getComputedStyle(slot).clipPath;
+        under.style.clipPath = clip && clip !== "none" ? clip : "";
       }
       raf = requestAnimationFrame(sync);
     };
 
     raf = requestAnimationFrame(sync);
     return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    const card = baseRef.current?.parentElement;
+    if (!card) return;
+    const enter = () => setHot(true);
+    const leave = () => setHot(false);
+    card.addEventListener("pointerenter", enter);
+    card.addEventListener("pointerleave", leave);
+    return () => {
+      card.removeEventListener("pointerenter", enter);
+      card.removeEventListener("pointerleave", leave);
+    };
   }, []);
 
   return (
@@ -62,7 +74,9 @@ export default function RevealImage({ src, className = "" }: RevealImageProps) {
         createPortal(
           <div
             ref={underRef}
-            className="reveal-fluid-image pointer-events-none fixed overflow-hidden"
+            className={`reveal-fluid-image pointer-events-none fixed overflow-hidden${
+              hot ? " is-hot" : ""
+            }`}
             style={{ left: 0, top: 0, width: 0, height: 0 }}
             aria-hidden
           >

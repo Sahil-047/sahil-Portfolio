@@ -7,6 +7,8 @@ import { SITE } from "@/lib/site";
 import { useTheme } from "@/components/ThemeProvider";
 import RevealImage from "@/components/RevealImage";
 import * as THREE from "three";
+import useIsMobile from "@/hooks/useIsMobile";
+import MobileInfo from "@/components/MobileInfo";
 
 type InfoProps = {
   onIndexClick?: () => void;
@@ -245,6 +247,10 @@ export default function Info({
   onInfoClick,
   onContactClick,
 }: InfoProps) {
+  const isMobile = useIsMobile();
+
+  if (isMobile === null) return null;
+  if (isMobile) return <MobileInfo onIndexClick={onIndexClick} />;
   return (
     <main
       id="page-content"

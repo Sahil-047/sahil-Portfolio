@@ -138,8 +138,9 @@ export default function AtmosphereBackground() {
       canvas.width = w;
       canvas.height = h;
       stars.length = 0;
-      const count = Math.floor((w * h) / 9000);
-      const darkCount = Math.floor((w * h) / 2800);
+      const mobile = window.matchMedia("(max-width: 767px)").matches;
+      const count = Math.floor((w * h) / (mobile ? 14000 : 9000));
+      const darkCount = Math.floor((w * h) / (mobile ? 4800 : 2800));
       const total = isDark ? darkCount : count;
       for (let i = 0; i < total; i++) {
         stars.push({
@@ -178,6 +179,7 @@ export default function AtmosphereBackground() {
 
     const front = isDark ? smokeRef.current : null;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const mobile = window.matchMedia("(max-width: 767px)").matches;
     const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
     const frontCtx = front?.getContext("2d", { alpha: true }) ?? null;
@@ -268,7 +270,7 @@ export default function AtmosphereBackground() {
     const resize = () => {
       viewW = window.innerWidth;
       viewH = window.innerHeight;
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const dpr = Math.min(window.devicePixelRatio || 1, mobile ? 1.15 : 1.5);
       canvas.width = Math.floor(viewW * dpr);
       canvas.height = Math.floor(viewH * dpr);
       canvas.style.width = `${viewW}px`;
@@ -283,8 +285,8 @@ export default function AtmosphereBackground() {
         frontCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
 
-      gw = Math.max(64, Math.floor(viewW / 14));
-      gh = Math.max(36, Math.floor(viewH / 14));
+      gw = Math.max(mobile ? 40 : 64, Math.floor(viewW / (mobile ? 22 : 14)));
+      gh = Math.max(mobile ? 24 : 36, Math.floor(viewH / (mobile ? 22 : 14)));
       amb = new Float32Array(gw * gh);
       splash = new Float32Array(gw * gh);
       vx = new Float32Array(gw * gh);
@@ -428,8 +430,13 @@ export default function AtmosphereBackground() {
     const animate = (now: number) => {
       const t = (now - t0) * 0.001;
       frame++;
-      step(t);
-      if (frame % 2 === 0) render(t);
+      if (mobile) {
+        if (frame % 3 === 0) step(t);
+        if (frame % 4 === 0) render(t);
+      } else {
+        step(t);
+        if (frame % 2 === 0) render(t);
+      }
       raf = requestAnimationFrame(animate);
     };
     raf = requestAnimationFrame(animate);

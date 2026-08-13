@@ -2,11 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { PROJECTS } from "@/lib/projects";
+import { PROJECTS, PROJECT_SELECT_EVENT, openProject } from "@/lib/projects";
 
 const N = PROJECTS.length;
 /** Card plane aspect 16:7 */
-const CARD_W = 3.35;
+const CARD_W = 3.85;
 const CARD_H = CARD_W * (7 / 16);
 /** Visible air between stacked cards (world units) */
 const CARD_GAP = 0.52;
@@ -60,11 +60,11 @@ const CARD_FRAG = /* glsl */ `
   }
 
   vec4 sampleBlur(sampler2D tex, vec2 uv, float radius) {
-    if (radius < 0.0004) return texture2D(tex, uv);
+    if (radius < 0.0005) return texture2D(tex, uv);
     vec4 sum = vec4(0.0);
     float wSum = 0.0;
-    for (int y = -2; y <= 2; y++) {
-      for (int x = -2; x <= 2; x++) {
+    for (int y = -1; y <= 1; y++) {
+      for (int x = -1; x <= 1; x++) {
         vec2 o = vec2(float(x), float(y)) * radius;
         float w = 1.0 / (1.0 + float(x * x + y * y));
         sum += texture2D(tex, clamp(uv + o, 0.0, 1.0)) * w;
@@ -78,35 +78,21 @@ const CARD_FRAG = /* glsl */ `
     float aspect = ${CARD_W.toFixed(3)} / ${CARD_H.toFixed(3)};
     vec2 px = vec2(blurAmt / aspect, blurAmt);
 
-    // Continuous chromatic drift
-    float drift = sin(time * 1.7 + phase) * 0.35 + sin(time * 0.9 + phase * 1.3) * 0.25;
-    float baseSplit = rgbAmt + glitchAmt * 0.006;
-    vec2 split = vec2((baseSplit * (1.0 + drift)) / aspect, baseSplit * 0.4);
+    float drift = sin(time * 0.7 + phase) * 0.18;
+    vec2 split = vec2((rgbAmt * (1.0 + drift)) / aspect, rgbAmt * 0.35);
 
-    // Occasional horizontal tear / slice glitch
-    float band = floor(vUv.y * 18.0);
-    float tearPulse = step(0.92, hash(band + floor(time * 6.0) + phase * 10.0));
-    float tear = (hash21(vec2(band, floor(time * 8.0))) - 0.5) * tearPulse * glitchAmt * 0.045;
+    float tear = 0.0;
+    if (glitchAmt > 0.04) {
+      float band = floor(vUv.y * 14.0);
+      float pulse = step(0.97, hash(band + floor(time * 3.2) + phase * 10.0));
+      tear = (hash21(vec2(band, floor(time * 4.0))) - 0.5) * pulse * glitchAmt * 0.028;
+    }
 
-    // Sparse blocky RGB kick
-    float block = step(0.96, hash(floor(time * 4.5) + phase * 7.0));
-    float blockShift = (hash(time * 0.2 + phase) - 0.5) * block * glitchAmt * 0.03;
+    vec4 sR = sampleBlur(map, vUv + split + vec2(tear, 0.0), px.x);
+    vec4 sG = sampleBlur(map, vUv + vec2(tear * 0.25, 0.0), px.x);
+    vec4 sB = sampleBlur(map, vUv - split + vec2(-tear * 0.45, 0.0), px.x);
 
-    vec2 uvR = vUv + split + vec2(tear + blockShift, 0.0);
-    vec2 uvG = vUv + vec2(tear * 0.35, 0.0);
-    vec2 uvB = vUv - split + vec2(-tear * 0.6 - blockShift * 0.5, 0.0);
-
-    float r = sampleBlur(map, uvR, px.x).r;
-    float g = sampleBlur(map, uvG, px.x).g;
-    float b = sampleBlur(map, uvB, px.x).b;
-    float a = sampleBlur(map, vUv, px.x).a;
-
-    // Mild channel boost on glitch hits
-    vec3 col = vec3(r, g, b) * tint;
-    col.r += tearPulse * glitchAmt * 0.04;
-    col.b += tearPulse * glitchAmt * 0.03;
-
-    gl_FragColor = vec4(col, a * opacity);
+    gl_FragColor = vec4(vec3(sR.r, sG.g, sB.b) * tint, sG.a * opacity);
   }
 `;
 
@@ -199,38 +185,24 @@ function poseFor(offset: number, reduceMotion: boolean): Pose {
   };
 }
 
-function lerpPose(a: Pose, b: Pose, t: number): Pose {
-  return {
-    x: THREE.MathUtils.lerp(a.x, b.x, t),
-    y: THREE.MathUtils.lerp(a.y, b.y, t),
-    z: THREE.MathUtils.lerp(a.z, b.z, t),
-    rotX: THREE.MathUtils.lerp(a.rotX, b.rotX, t),
-    rotY: THREE.MathUtils.lerp(a.rotY, b.rotY, t),
-    scale: THREE.MathUtils.lerp(a.scale, b.scale, t),
-    scaleX: THREE.MathUtils.lerp(a.scaleX, b.scaleX, t),
-    scaleY: THREE.MathUtils.lerp(a.scaleY, b.scaleY, t),
-    opacity: THREE.MathUtils.lerp(a.opacity, b.opacity, t),
-  };
+function damp(current: number, goal: number, lambda: number, dt: number) {
+  return current + (goal - current) * (1 - Math.exp(-lambda * dt));
 }
 
-function poseForFloat(offset: number, reduceMotion: boolean): Pose {
-  const i0 = Math.floor(offset);
-  const i1 = Math.ceil(offset);
-  if (i0 === i1) return poseFor(i0, reduceMotion);
-  const t = offset - i0;
-  return lerpPose(poseFor(i0, reduceMotion), poseFor(i1, reduceMotion), t);
-}
-
-/** Blur / RGB / glitch strength — always some RGB, stronger off-center */
-function fxFromOffset(absOffset: number, reduceMotion: boolean) {
-  if (reduceMotion) return { blurAmt: 0, rgbAmt: 0.004, glitchAmt: 0 };
+/** Blur / RGB — quiet on the focused card, a little more on neighbors */
+function fxFromOffset(
+  absOffset: number,
+  speed: number,
+  reduceMotion: boolean,
+) {
+  if (reduceMotion) return { blurAmt: 0, rgbAmt: 0.002, glitchAmt: 0 };
   const t = THREE.MathUtils.clamp(absOffset, 0, 2) / 2;
   const ease = t * t * (3 - 2 * t);
+  const travel = THREE.MathUtils.clamp(speed * 1.1, 0, 1);
   return {
-    blurAmt: ease * 0.024,
-    // Center keeps a light chromatic fringe; neighbors go harder
-    rgbAmt: 0.006 + ease * 0.034,
-    glitchAmt: 0.55 + ease * 1.35,
+    blurAmt: ease * 0.01 + travel * 0.018,
+    rgbAmt: 0.002 + ease * 0.016 + travel * 0.01,
+    glitchAmt: ease * 0.35 + travel * 0.2,
   };
 }
 
@@ -242,7 +214,7 @@ type CardMesh = THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial> & {
 };
 
 /**
- * Dark-mode carousel: continuous inertial scroll, mouse parallax tilt, motion blur.
+ * Dark-mode carousel: damped follow + settle, shader motion blur only.
  */
 export default function DarkProjectCarousel() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -256,15 +228,19 @@ export default function DarkProjectCarousel() {
     ).matches;
 
     let scroll = 0;
-    let scrollVel = 0;
+    let target = 0;
+    let lastWheelMs = 0;
     let pointerNorm = 0;
     let pointerNormSmooth = 0;
     let disposed = false;
     let raf = 0;
+    const SNAP_IDLE_MS = 140;
+    const FOLLOW_LIVE = 16;
+    const FOLLOW_SETTLE = 8;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 40);
-    camera.position.set(-0.15, 0, 5.85);
+    const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 40);
+    camera.position.set(-0.15, 0, 6.2);
     camera.lookAt(-0.25, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({
@@ -278,6 +254,7 @@ export default function DarkProjectCarousel() {
     mount.appendChild(renderer.domElement);
     renderer.domElement.className = "project-carousel__canvas";
     renderer.domElement.style.pointerEvents = "auto";
+    renderer.domElement.style.willChange = "transform";
 
     const loader = new THREE.TextureLoader();
     const cards: CardMesh[] = [];
@@ -347,27 +324,34 @@ export default function DarkProjectCarousel() {
       const hits = raycaster.intersectObjects(cards, false);
       if (!hits.length) return;
       const hit = hits[0].object as CardMesh;
-      const offset = cardOffset(hit.userData.index, scroll);
+      const offset = cardOffset(hit.userData.index, target);
       if (Math.abs(offset) > 0.35) {
-        scroll += Math.sign(offset);
-        scrollVel = Math.sign(offset) * 0.8;
+        target += offset;
+        lastWheelMs = 0;
+        return;
       }
+      openProject(hit.userData.index);
     };
 
     const onClick = (e: MouseEvent) => onPointer(e.clientX, e.clientY);
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) return;
       e.preventDefault();
-      // Light mode: track.scrollTop += deltaY — same card travel per pixel here
-      scroll += e.deltaY / pixelsPerCard();
-      if (!reduceMotion && e.deltaY !== 0) {
-        scrollVel += e.deltaY * 0.012;
-      }
+      lastWheelMs = performance.now();
+      target += e.deltaY / pixelsPerCard();
+    };
+
+    const onSelect = (e: Event) => {
+      const index = (e as CustomEvent<{ index: number }>).detail?.index;
+      if (typeof index !== "number") return;
+      target += cardOffset(index, target);
+      lastWheelMs = 0;
     };
 
     renderer.domElement.addEventListener("click", onClick);
     window.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("pointermove", onPointerMove, { passive: true });
+    window.addEventListener(PROJECT_SELECT_EVENT, onSelect);
 
     const resize = () => {
       const w = mount.clientWidth || 1;
@@ -389,55 +373,45 @@ export default function DarkProjectCarousel() {
       const dt = Math.min(clock.getDelta(), 0.05);
       const t = clock.elapsedTime;
 
-      if (!reduceMotion) {
-        // scrollVel is blur energy only (position is 1:1 like light mode)
-        scrollVel *= Math.pow(0.86, dt * 60);
-        if (Math.abs(scrollVel) < 0.0008) scrollVel = 0;
+      const prevScroll = scroll;
+      const idle = performance.now() - lastWheelMs > SNAP_IDLE_MS;
+      if (idle) target = Math.round(target);
+
+      if (reduceMotion) {
+        scroll = target;
+      } else {
+        const lambda = idle ? FOLLOW_SETTLE : FOLLOW_LIVE;
+        scroll = damp(scroll, target, lambda, dt);
+        if (idle && Math.abs(target - scroll) < 0.00035) scroll = target;
       }
 
-      pointerNormSmooth += (pointerNorm - pointerNormSmooth) * 0.14;
-      // Left → tilt toward screen; right → recede
-      const parallaxZ = -pointerNormSmooth * 0.32;
-      const parallaxRotY = pointerNormSmooth * THREE.MathUtils.degToRad(9);
-
-      const blur = reduceMotion
+      const speed = reduceMotion
         ? 0
-        : Math.min(14, Math.abs(scrollVel) * 110);
-      renderer.domElement.style.filter =
-        blur > 0.35 ? `blur(0px ${blur.toFixed(2)}px)` : "none";
+        : Math.min(Math.abs(scroll - prevScroll) / Math.max(dt, 0.001), 8);
 
-      const order = [...cards].sort((a, b) => {
-        const za = poseForFloat(cardOffset(a.userData.index, scroll), reduceMotion).z;
-        const zb = poseForFloat(cardOffset(b.userData.index, scroll), reduceMotion).z;
-        return za - zb;
-      });
-      order.forEach((card, i) => {
-        card.renderOrder = i;
-      });
+      pointerNormSmooth = damp(pointerNormSmooth, pointerNorm, 8, dt);
+      const parallaxZ = -pointerNormSmooth * 0.28;
+      const parallaxRotY = pointerNormSmooth * THREE.MathUtils.degToRad(8);
+      const rest = THREE.MathUtils.clamp(1 - speed * 0.55, 0, 1);
 
       cards.forEach((card) => {
         const offset = cardOffset(card.userData.index, scroll);
-        const p = poseForFloat(offset, reduceMotion);
-        const fx = fxFromOffset(Math.abs(offset), reduceMotion);
+        const abs = Math.abs(offset);
+        card.renderOrder = 8 - abs;
+        const p = poseFor(offset, reduceMotion);
+        const fx = fxFromOffset(abs, speed, reduceMotion);
         const phase = card.userData.phase;
         const floatY = reduceMotion
           ? 0
-          : Math.sin(t * 1.05 + phase) * 0.045 +
-            Math.sin(t * 0.55 + phase * 1.2) * 0.02;
-        const floatX = reduceMotion
-          ? 0
-          : Math.sin(t * 0.7 + phase) * 0.02;
+          : Math.sin(t * 0.55 + phase) * 0.016 * rest;
         const floatRotZ = reduceMotion
           ? 0
-          : Math.sin(t * 0.8 + phase) * 0.012;
+          : Math.sin(t * 0.4 + phase) * 0.006 * rest;
 
-        card.position.set(p.x + floatX, p.y + floatY, p.z + parallaxZ);
+        card.position.set(p.x, p.y + floatY, p.z + parallaxZ);
         card.rotation.x = p.rotX;
         card.rotation.z = floatRotZ;
-        card.rotation.y =
-          p.rotY +
-          parallaxRotY +
-          (reduceMotion ? 0 : Math.sin(t * 0.6 + phase) * 0.015);
+        card.rotation.y = p.rotY + parallaxRotY;
         card.scale.set(p.scale * p.scaleX, p.scale * p.scaleY, p.scale);
 
         const mat = card.material;
@@ -461,6 +435,7 @@ export default function DarkProjectCarousel() {
       renderer.domElement.removeEventListener("click", onClick);
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener(PROJECT_SELECT_EVENT, onSelect);
       renderer.domElement.style.filter = "none";
       cards.forEach((card) => {
         card.material.uniforms.map.value?.dispose();
@@ -476,7 +451,7 @@ export default function DarkProjectCarousel() {
 
   return (
     <aside
-      className="project-carousel project-carousel--coverflow pointer-events-none absolute inset-y-4 left-[32%] z-[26] sm:inset-y-5 sm:left-[38%]"
+      className="project-carousel project-carousel--coverflow pointer-events-none absolute inset-y-0 left-[26%] z-[26] sm:left-[32%]"
       aria-label="Projects"
       data-carousel="three-coverflow"
     >
