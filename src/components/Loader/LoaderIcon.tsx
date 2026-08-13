@@ -34,8 +34,8 @@ function MoonDisc({
           */}
           <circle
             className="loader__moon-shadow"
-            cx="48"
-            cy="16"
+            cx="47.12"
+            cy="16.88"
             r="16"
             fill="black"
           />

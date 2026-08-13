@@ -1,16 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 /**
  * Dark-mode loading atmosphere: deep blue void, stars, drifting smoke.
  */
+function dismissBootScreen() {
+  document.getElementById("boot-screen")?.remove();
+}
+
 export default function LoaderBackground() {
   const starsRef = useRef<HTMLCanvasElement | null>(null);
   const smokeRef = useRef<HTMLCanvasElement | null>(null);
 
   // Stars
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = starsRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -56,10 +60,16 @@ export default function LoaderBackground() {
     };
     resize();
     window.addEventListener("resize", resize);
+    dismissBootScreen();
 
     const loop = (now: number) => {
       frame++;
-      if (!reduce && frame % 4 === 0) paint((now - t0) * 0.001);
+      if (reduce) return;
+      if (frame < 8) {
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+      if (frame % 4 === 0) paint((now - t0) * 0.001);
       raf = requestAnimationFrame(loop);
     };
     if (!reduce) raf = requestAnimationFrame(loop);
@@ -71,7 +81,7 @@ export default function LoaderBackground() {
   }, []);
 
   // Smoke
-  useEffect(() => {
+  useLayoutEffect(() => {
     const canvas = smokeRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d", { alpha: true });
@@ -214,11 +224,9 @@ export default function LoaderBackground() {
       bctx.putImageData(img, 0, 0);
       ctx.clearRect(0, 0, viewW, viewH);
       ctx.imageSmoothingEnabled = true;
-      // Soft base pass
       ctx.filter = "blur(22px)";
       ctx.globalAlpha = 0.95;
       ctx.drawImage(buf, 0, 0, viewW, viewH);
-      // Sharper denser second pass for volume
       ctx.filter = "blur(10px)";
       ctx.globalAlpha = 0.55;
       ctx.drawImage(buf, 0, 0, viewW, viewH);
@@ -226,15 +234,21 @@ export default function LoaderBackground() {
       ctx.globalAlpha = 1;
     };
 
+    render(0);
+    dismissBootScreen();
+
     if (reduce) {
-      step(0);
-      render(0);
       return () => window.removeEventListener("resize", resize);
     }
 
     const animate = (now: number) => {
       const t = (now - t0) * 0.001;
       frame++;
+      // Hold the first painted frame so the sim doesn't pop
+      if (frame < 3) {
+        raf = requestAnimationFrame(animate);
+        return;
+      }
       step(t);
       if (frame % 2 === 0) render(t);
       raf = requestAnimationFrame(animate);

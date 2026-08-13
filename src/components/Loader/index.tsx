@@ -78,12 +78,6 @@ export default function Loader({ onComplete }: LoaderProps) {
 
       const tl = gsap.timeline({ onComplete });
 
-      tl.fromTo(
-        content,
-        { opacity: 0 },
-        { opacity: 1, duration: 0.5, ease: "power1.out" },
-      );
-
       tl.to(
         counter,
         {
@@ -94,7 +88,7 @@ export default function Loader({ onComplete }: LoaderProps) {
             percentEl.textContent = `${Math.round(counter.value)}%`;
           },
         },
-        0.15,
+        0,
       );
 
       // Finish toward full cover from wherever the phase currently is

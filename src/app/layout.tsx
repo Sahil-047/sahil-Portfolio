@@ -35,7 +35,10 @@ export default function RootLayout({
       lang="en"
       className={`${archivoBlack.variable} ${dmSans.variable} h-full`}
     >
-      <body className="min-h-full antialiased">{children}</body>
+      <body className="min-h-full antialiased">
+        <div id="boot-screen" aria-hidden="true" />
+        {children}
+      </body>
     </html>
   );
 }
