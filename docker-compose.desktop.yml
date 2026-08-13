@@ -3,5 +3,3 @@ services:
   web:
     ports:
       - "3000:3000"
-  caddy:
-    profiles: ["hostinger"]
