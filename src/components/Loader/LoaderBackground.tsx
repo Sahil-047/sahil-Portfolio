@@ -26,7 +26,7 @@ export default function LoaderBackground() {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const paint = (t: number) => {
-      ctx.fillStyle = "#010206";
+      ctx.fillStyle = "#060b18";
       ctx.fillRect(0, 0, w, h);
       for (const s of stars) {
         const a = reduce ? s.a : s.a * (0.7 + 0.3 * Math.sin(t * 1.2 + s.tw));
@@ -41,13 +41,14 @@ export default function LoaderBackground() {
       canvas.width = w;
       canvas.height = h;
       stars.length = 0;
-      const total = Math.floor((w * h) / 2800);
+      // ~3× denser field than before (/2800 → /900)
+      const total = Math.floor((w * h) / 900);
       for (let i = 0; i < total; i++) {
         stars.push({
           x: Math.random() * w,
           y: Math.random() * h,
-          r: Math.random() < 0.7 ? 1 : Math.random() < 0.92 ? 1.5 : 2,
-          a: 0.35 + Math.random() * 0.6,
+          r: Math.random() < 0.55 ? 1 : Math.random() < 0.88 ? 1.5 : 2.2,
+          a: 0.45 + Math.random() * 0.55,
           tw: Math.random() * Math.PI * 2,
         });
       }
@@ -132,15 +133,22 @@ export default function LoaderBackground() {
       const wobble =
         Math.sin(diag * 12 + t * 0.85) * 0.14 +
         Math.sin(across * 15 - t * 1.05) * 0.12;
+      // Wide bands + full-frame base so edges/corners stay filled (no vignette)
       const band =
-        Math.exp(-Math.pow((across - wobble * 0.35) * 2.4, 2)) * 0.55 +
-        Math.exp(-Math.pow((across - 0.35 - wobble * 0.25) * 2.8, 2)) * 0.4 +
-        Math.exp(-Math.pow((across + 0.3 - wobble * 0.2) * 3.1, 2)) * 0.32;
+        Math.exp(-Math.pow((across - wobble * 0.35) * 1.55, 2)) * 0.72 +
+        Math.exp(-Math.pow((across - 0.35 - wobble * 0.25) * 1.8, 2)) * 0.58 +
+        Math.exp(-Math.pow((across + 0.3 - wobble * 0.2) * 1.95, 2)) * 0.5 +
+        Math.exp(-Math.pow((across + 0.55 - wobble * 0.15) * 2.2, 2)) * 0.38;
       const flow =
-        fbm(diag * 3.2 - t * 0.22, across * 2.6 + t * 0.18) * 0.55 +
-        fbm(u * 2.4 + t * 0.12, v * 2.1 - t * 0.1) * 0.35;
-      const veil = Math.pow(Math.max(0, 1 - Math.abs(across) * 0.85), 1.2);
-      return Math.min(0.95, (band * 0.65 + flow * 0.5) * (0.45 + veil * 0.6));
+        fbm(diag * 3.2 - t * 0.22, across * 2.6 + t * 0.18) * 0.72 +
+        fbm(u * 2.4 + t * 0.12, v * 2.1 - t * 0.1) * 0.55 +
+        fbm(u * 4.1 - t * 0.08, v * 3.6 + t * 0.14) * 0.32;
+      // Soft sheet across the whole frame (corners included)
+      const sheet =
+        0.42 +
+        fbm(u * 1.6 + t * 0.06, v * 1.4 - t * 0.05) * 0.38 +
+        fbm((1 - u) * 1.8 - t * 0.04, (1 - v) * 1.5 + t * 0.07) * 0.28;
+      return Math.min(1.2, sheet * 0.75 + band * 0.7 + flow * 0.55);
     };
 
     const resize = () => {
@@ -159,20 +167,27 @@ export default function LoaderBackground() {
       buf.width = gw;
       buf.height = gh;
       img = bctx.createImageData(gw, gh);
+      // Seed full frame so first paint isn't edge-dark
+      for (let j = 0; j < gh; j++) {
+        for (let i = 0; i < gw; i++) {
+          amb[ix(i, j)] = ambientTarget(i, j, 0);
+        }
+      }
     };
 
     resize();
     window.addEventListener("resize", resize);
 
     const step = (t: number) => {
-      for (let j = 1; j < gh - 1; j++) {
-        for (let i = 1; i < gw - 1; i++) {
+      // Include border cells so blur never reveals a dark vignette ring
+      for (let j = 0; j < gh; j++) {
+        for (let i = 0; i < gw; i++) {
           const id = ix(i, j);
           const target = ambientTarget(i, j, t);
           amb[id] += (target - amb[id]) * 0.05;
           const jig = (fbm(i * 0.08 + t * 0.3, j * 0.08 - t * 0.25) - 0.5) * 0.8;
-          const si = Math.min(gw - 2, Math.max(1, (i + jig) | 0));
-          const sj = Math.min(gh - 2, Math.max(1, (j - 0.25 - jig * 0.5) | 0));
+          const si = Math.min(gw - 1, Math.max(0, (i + jig) | 0));
+          const sj = Math.min(gh - 1, Math.max(0, (j - 0.25 - jig * 0.5) | 0));
           tmp[id] = amb[ix(si, sj)] * 0.97 + amb[id] * 0.03;
         }
       }
@@ -184,23 +199,28 @@ export default function LoaderBackground() {
       data.fill(0);
       for (let j = 0; j < gh; j++) {
         for (let i = 0; i < gw; i++) {
-          const dens = Math.min(1.3, amb[ix(i, j)] * 1.05);
-          if (dens < 0.02) continue;
+          const dens = Math.min(1.55, amb[ix(i, j)] * 1.35);
+          if (dens < 0.015) continue;
           const n =
-            noise(i * 0.08 + t * 0.1, j * 0.08 - t * 0.08) * 0.35;
-          const d = Math.min(1.4, dens + n);
+            noise(i * 0.08 + t * 0.1, j * 0.08 - t * 0.08) * 0.42;
+          const d = Math.min(1.7, dens + n);
           const p = (j * gw + i) * 4;
-          data[p] = 40 + d * 38;
-          data[p + 1] = 58 + d * 52;
-          data[p + 2] = 95 + d * 70;
-          data[p + 3] = Math.min(170, 28 + d * 120);
+          data[p] = 36 + d * 42;
+          data[p + 1] = 52 + d * 58;
+          data[p + 2] = 90 + d * 78;
+          data[p + 3] = Math.min(220, 48 + d * 155);
         }
       }
       bctx.putImageData(img, 0, 0);
       ctx.clearRect(0, 0, viewW, viewH);
       ctx.imageSmoothingEnabled = true;
-      ctx.filter = "blur(18px)";
-      ctx.globalAlpha = 0.85;
+      // Soft base pass
+      ctx.filter = "blur(22px)";
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(buf, 0, 0, viewW, viewH);
+      // Sharper denser second pass for volume
+      ctx.filter = "blur(10px)";
+      ctx.globalAlpha = 0.55;
       ctx.drawImage(buf, 0, 0, viewW, viewH);
       ctx.filter = "none";
       ctx.globalAlpha = 1;

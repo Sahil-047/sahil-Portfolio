@@ -38,7 +38,7 @@ export default function Loader({ onComplete }: LoaderProps) {
       const percentEl = percentRef.current;
       if (!root || !content || !percentEl) return;
 
-      const shadow = root.querySelector(".loader__moon-shadow");
+      const shadows = root.querySelectorAll(".loader__moon-shadow");
 
       const reducedMotion = window.matchMedia(
         "(prefers-reduced-motion: reduce)",
@@ -55,19 +55,24 @@ export default function Loader({ onComplete }: LoaderProps) {
       }
 
       const phase = { t: 0.08 }; // start near TR crescent
-      if (shadow) setShadowPos(shadow, phase.t);
+      if (shadows.length) {
+        shadows.forEach((shadow) => setShadowPos(shadow, phase.t));
+      }
 
       // Softer, slower lunar cycle driven by a float (smoother than attr tweening)
-      const moonPhase = shadow
-        ? gsap.to(phase, {
-            t: 1,
-            duration: 2.1,
-            ease: "power1.inOut",
-            yoyo: true,
-            repeat: -1,
-            onUpdate: () => setShadowPos(shadow, phase.t),
-          })
-        : null;
+      const moonPhase =
+        shadows.length > 0
+          ? gsap.to(phase, {
+              t: 1,
+              duration: 2.1,
+              ease: "power1.inOut",
+              yoyo: true,
+              repeat: -1,
+              onUpdate: () => {
+                shadows.forEach((shadow) => setShadowPos(shadow, phase.t));
+              },
+            })
+          : null;
 
       const counter = { value: 0 };
 
@@ -95,12 +100,14 @@ export default function Loader({ onComplete }: LoaderProps) {
       // Finish toward full cover from wherever the phase currently is
       tl.add(() => {
         moonPhase?.kill();
-        if (shadow) {
+        if (shadows.length) {
           gsap.to(phase, {
             t: 0.5, // center = fully covered
             duration: 0.85,
             ease: "power1.inOut",
-            onUpdate: () => setShadowPos(shadow, phase.t),
+            onUpdate: () => {
+              shadows.forEach((shadow) => setShadowPos(shadow, phase.t));
+            },
           });
         }
       });

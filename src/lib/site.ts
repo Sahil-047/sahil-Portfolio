@@ -1,15 +1,14 @@
 export const SITE = {
   name: "Sahil Golder",
-  email: "hello@sahilgolder.dev",
+  email: "sgolder4@gmail.com",
   available: "October 2026",
   year: 2026,
   aboutImage: "/images/about.jpg",
   bio: [
-    "I'm Sahil, a creative developer focused on building websites that are highly performant and layered with immersive motion and interactions.",
-    "I come from a design-aware background which helps me work with designers to bring their ideas to life. I love converting static layouts into memorable experiences.",
-    "I partner with creative teams to produce brand websites, digital products, and whatever the brief needs — always with craft, clarity, and motion in mind.",
+    "I'm Sahil, I build for the web the way a director builds a scene: performance as the backbone, motion as the language.",
+    "Design aware, code fluent I sit close enough to designers to speak their intent fluently, and translate it into interfaces that don't just load, they arrive.",
+    "Static layouts are my raw material. I turn flat compositions into layered, interactive moments the scroll that feels choreographed, the transition that feels inevitable, the interaction that feels like it was always meant to be there.",
   ],
   frontendTools: ["Next.js, React", "GSAP, Three.js", "GLSL, Figma", "TypeScript"],
   backendTools: ["Node.js, Express", "MongoDB, MySQL", "REST, GraphQL", "TypeScript"],
-  awards: ["1x SIH Winner"],
 } as const;

@@ -1,28 +1,28 @@
 export const PROJECTS = [
   {
-    id: "estrela",
-    label: "Estrela Studio",
-    image: "/images/projects/estrela.jpg",
+    id: "paintsaas",
+    label: "PaintSaaS",
+    image: "/images/projects/paintsaas.png",
   },
   {
-    id: "yucca",
-    label: "Yucca Packaging",
-    image: "/images/projects/yucca.jpg",
+    id: "gyanin",
+    label: "Gyanin Academy",
+    image: "/images/projects/gyanin.png",
   },
   {
-    id: "zulik",
-    label: "Zulik",
-    image: "/images/projects/zulik.jpg",
+    id: "tri",
+    label: "Tri",
+    image: "/images/projects/tri.png",
   },
   {
-    id: "payjustnow",
-    label: "PayJustNow",
-    image: "/images/projects/payjustnow.jpg",
+    id: "khan-trading",
+    label: "Khan Trading World",
+    image: "/images/projects/khan-trading.png",
   },
   {
-    id: "vineyard",
-    label: "Vineyard Hotel",
-    image: "/images/projects/vineyard.jpg",
+    id: "atelier",
+    label: "Atelier",
+    image: "/images/projects/atelier.png",
   },
 ] as const;
 
